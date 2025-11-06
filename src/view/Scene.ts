@@ -1,7 +1,11 @@
 import { Assets, Container } from 'pixi.js';
-import { TileView } from './TileView';
+import { GridView } from './GridView';
+import { randomPiece, randomRot } from '@core/pieces';
+import { loadConfig } from '@core/config';
 
 export class Scene extends Container {
+  private config = loadConfig();
+
   constructor() {
     super();
     this.init();
@@ -10,18 +14,18 @@ export class Scene extends Container {
   private async init() {
     await this.loadAssets();
 
-    // for testing purpose
-    const tile = new TileView();
-    await tile.init();
-    await tile.setPiece('straight', 0);
-    tile.position.set(10, 40);
-    this.addChild(tile);
+    const { cols, rows, tileSize } = this.config.grid;
 
-    const tile2 = new TileView();
-    await tile2.init();
-    await tile2.setPiece('empty', 0);
-    tile2.position.set(130, 40);
-    this.addChild(tile2);
+    // GridView setup
+    const gridView = new GridView(cols, rows, tileSize, 5);
+    await gridView.init();
+    this.addChild(gridView);
+
+    gridView.on('grid:tileSelected', async ({ tile }) => {
+      const kind = randomPiece();
+      const rot = randomRot();
+      await tile.setPiece(kind, rot);
+    });
   }
 
   private async loadAssets() {

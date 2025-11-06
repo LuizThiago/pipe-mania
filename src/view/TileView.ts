@@ -1,18 +1,27 @@
 import { Assets, Container, Sprite } from 'pixi.js';
-import { ASSETS, TILE_SIZE } from '@core/constants';
+import { ASSETS, Z_ORDERS } from '@core/constants';
 import type { PipeKind, Rot } from '@core/types';
 
 export class TileView extends Container {
   private bg!: Sprite;
   private piece?: Sprite;
   private currentKind?: PipeKind;
-  private currentRot?: Rot = 0;
+  private currentRot: Rot = 0;
+
+  constructor(
+    private tileSize: number = 100,
+    private row: number,
+    private col: number
+  ) {
+    super();
+  }
 
   async init() {
     const [bgTex] = await Promise.all([Assets.load(ASSETS.empty)]);
     this.bg = new Sprite(bgTex);
     this.setupSpriteToTile(this.bg);
     this.addChild(this.bg);
+    this.setupClickEvent();
   }
 
   async setPiece(kind: PipeKind = 'empty', rot: Rot = 0) {
@@ -38,8 +47,8 @@ export class TileView extends Container {
       this.piece = pieceSprite;
       this.setupSpriteToTile(this.piece);
       this.addChild(this.piece);
-      this.setChildIndex(this.bg, 0);
-      this.setChildIndex(this.piece, 1);
+      this.setChildIndex(this.bg, Z_ORDERS.tiles_bg);
+      this.setChildIndex(this.piece, Z_ORDERS.pieces);
     } else {
       this.piece.texture = tex;
     }
@@ -65,17 +74,30 @@ export class TileView extends Container {
   }
 
   private setupSpriteToTile(sprite: Sprite) {
+    this.setSpriteAnchorPosition(sprite);
+    this.setSpriteScale(sprite);
+
+    this.width = this.tileSize;
+    this.height = this.tileSize;
+  }
+
+  private setSpriteAnchorPosition(sprite: Sprite) {
     sprite.anchor.set(0.5, 0.5);
-    sprite.position.set(TILE_SIZE / 2, TILE_SIZE / 2);
+    sprite.position.set(this.tileSize / 2, this.tileSize / 2);
+  }
 
-    // scale the sprite to fit tile size
-    const w = sprite.texture.width || TILE_SIZE;
-    const h = sprite.texture.height || TILE_SIZE;
-    const sx = TILE_SIZE / w;
-    const sy = TILE_SIZE / h;
+  private setSpriteScale(sprite: Sprite) {
+    const w = sprite.texture.width || this.tileSize;
+    const h = sprite.texture.height || this.tileSize;
+    const sx = this.tileSize / w;
+    const sy = this.tileSize / h;
     sprite.scale.set(sx, sy);
+  }
 
-    this.width = TILE_SIZE;
-    this.height = TILE_SIZE;
+  private setupClickEvent() {
+    this.eventMode = 'static';
+    this.on('pointertap', () => {
+      this.emit('tile:click', { col: this.col, row: this.row });
+    });
   }
 }

@@ -22,3 +22,16 @@
 - I was getting annoying having to update strings in multiple places, so I fixed the pipe types mess. Now `ALL_PIPE_KINDS` lives in constants and everything else derives from it using TypeScript's `Exclude`. Much better, and adding new pipe types will be way easier.
 - Added **random piece functions** when you click a tile, it gets a random piece and rotation. Basic but it works, and the types are all safe. It's still not deterministic btw...
 - Connected everything in the **Scene** and **GridView** is integrated and tile clicks actually do something now. Starting to feel like a real game.
+
+### November 6, 2025
+
+- I refactored the `Scene`, pulling the gameplay logic into a dedicated **GameController** so the flow lives in one place.
+- I introduced **random blocked cells** into the initial board to break up the grid (still planning to seed this for deterministic runs later on).
+- Filled in the rest of the placement rules: each tile now keeps track of its kind, rotation, and whether it’s blocked every time I click.
+- Built the connection checks using the pipe ports with proper directional mapping and rotation handling.
+- Wired up the **longest-path DFS** with visual highlighting so connected routes glow instantly.
+- Extracted the initial board setup into a reusable **board builder** that prepares the grid (blocked tiles included) before the controller boots up.
+- Introduced a **GridPort interface**, letting the controller talk to the grid through a small contract instead of Pixi internals.
+- Updated `GridView` to implement that interface, keeping rendering separate from orchestration.
+- Having the **GameController** in place clarified responsibilities across the system, and the link detection logic proved how solid foundations make later features easier to plug in.
+- Next up, I’ll probably move toward water feature or score logic, now that the board itself behaves as expected.

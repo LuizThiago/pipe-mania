@@ -1,7 +1,8 @@
 import { Container } from 'pixi.js';
+import type { GridPort } from '@core/ports/GridPort';
 import { TileView } from './TileView';
 
-export class GridView extends Container {
+export class GridView extends Container implements GridPort {
   private tiles: TileView[][] = [];
   private blockedTiles: boolean[][] = [];
 
@@ -69,7 +70,7 @@ export class GridView extends Container {
   }
 
   // --- Path Highlighting Methods ---
-  setHighlight(path: Array<{ col: number; row: number }>) {
+  setHighlight(path: ReadonlyArray<{ col: number; row: number }>) {
     for (const row of this.tiles) for (const t of row) t.setHighlighted(false);
     for (const n of path) this.tiles[n.row][n.col]?.setHighlighted(true);
   }

@@ -3,6 +3,7 @@ import { TileView } from './TileView';
 
 export class GridView extends Container {
   private tiles: TileView[][] = [];
+  private blockedTiles: boolean[][] = [];
 
   constructor(
     private rows: number,
@@ -11,6 +12,9 @@ export class GridView extends Container {
     private gap: number = 0
   ) {
     super();
+    this.blockedTiles = Array.from({ length: rows }, () =>
+      Array.from({ length: cols }, () => false)
+    );
   }
 
   async init() {
@@ -37,6 +41,9 @@ export class GridView extends Container {
       throw error;
     }
   }
+
+  // --- Getters ---
+
   getTile(x: number, y: number): TileView | null {
     if (x < 0 || x >= this.cols || y < 0 || y >= this.rows) {
       return null;
@@ -44,6 +51,24 @@ export class GridView extends Container {
 
     return this.tiles[y][x];
   }
+
+  // --- Block Getter/Setter Methods ---
+
+  setAsBlocked(col: number, row: number) {
+    const tile = this.tiles[row]?.[col];
+    if (!tile) {
+      return;
+    }
+
+    this.blockedTiles[row][col] = true;
+    tile.setIsBlocked(true);
+  }
+
+  isBlocked(col: number, row: number): boolean {
+    return !!this.blockedTiles[row]?.[col];
+  }
+
+  // --- Initialization Methods ---
 
   private setupClickEvent(tile: TileView) {
     tile.on('tile:click', payload => {

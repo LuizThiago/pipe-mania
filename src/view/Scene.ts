@@ -1,10 +1,11 @@
 import { Assets, Container } from 'pixi.js';
 import { GridView } from './GridView';
-import { randomPiece, randomRot } from '@core/pieces';
 import { loadConfig } from '@core/config';
+import { GameController } from '@core/controller/GameController';
 
 export class Scene extends Container {
   private config = loadConfig();
+  private gridView?: GridView;
 
   constructor() {
     super();
@@ -16,16 +17,9 @@ export class Scene extends Container {
 
     const { cols, rows, tileSize } = this.config.grid;
 
-    // GridView setup
-    const gridView = new GridView(cols, rows, tileSize, 5);
-    await gridView.init();
-    this.addChild(gridView);
+    this.gridView = await this.setupGrid(cols, rows, tileSize);
 
-    gridView.on('grid:tileSelected', async ({ tile }) => {
-      const kind = randomPiece();
-      const rot = randomRot();
-      await tile.setPiece(kind, rot);
-    });
+    new GameController(this.gridView, this.config);
   }
 
   private async loadAssets() {
@@ -36,5 +30,12 @@ export class Scene extends Container {
       '/assets/pipes/cross-pipe.png',
       '/assets/pipes/start-pipe.png',
     ]);
+  }
+
+  private async setupGrid(cols: number, rows: number, tileSize: number): Promise<GridView> {
+    const gridView = new GridView(cols, rows, tileSize, this.config.grid.tileGap ?? 5);
+    await gridView.init();
+    this.addChild(gridView);
+    return gridView;
   }
 }

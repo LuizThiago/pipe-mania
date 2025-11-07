@@ -7,6 +7,7 @@ export class TileView extends Container {
   private piece?: Sprite;
   private currentKind?: PipeKind;
   private currentRot: Rot = 0;
+  private blocked: boolean = false;
 
   constructor(
     private tileSize: number = 100,
@@ -16,12 +17,32 @@ export class TileView extends Container {
     super();
   }
 
+  // --- Initialization Methods ---
+
   async init() {
     const [bgTex] = await Promise.all([Assets.load(ASSETS.empty)]);
     this.bg = new Sprite(bgTex);
     this.setupSpriteToTile(this.bg);
     this.addChild(this.bg);
     this.setupClickEvent();
+  }
+
+  private setupSpriteToTile(sprite: Sprite) {
+    this.setSpriteAnchorPosition(sprite);
+    this.setSpriteScale(sprite);
+  }
+  private setupClickEvent() {
+    this.eventMode = 'static';
+    this.on('pointertap', () => {
+      this.emit('tile:click', { col: this.col, row: this.row });
+    });
+  }
+
+  // --- Setters ---
+
+  setIsBlocked(isBlocked: boolean) {
+    this.blocked = isBlocked;
+    this.bg.visible = !this.blocked;
   }
 
   async setPiece(kind: PipeKind = 'empty', rot: Rot = 0) {
@@ -39,12 +60,7 @@ export class TileView extends Container {
     const tex = await Assets.load(ASSETS[kind]);
 
     if (!this.piece) {
-      let pieceSprite = new Sprite(tex);
-      if (!pieceSprite) {
-        throw new Error(`Failed to load texture for kind: ${kind}`);
-      }
-
-      this.piece = pieceSprite;
+      this.piece = new Sprite(tex);
       this.setupSpriteToTile(this.piece);
       this.addChild(this.piece);
       this.setChildIndex(this.bg, Z_ORDERS.tiles_bg);
@@ -66,19 +82,13 @@ export class TileView extends Container {
     this.currentRot = 0;
   }
 
+  // --- Helper Methods ---
+
   private applyRotation(rot: Rot): void {
     if (!this.piece || this.currentRot === rot) return;
 
     this.currentRot = rot;
     this.piece.rotation = (Math.PI / 2) * rot;
-  }
-
-  private setupSpriteToTile(sprite: Sprite) {
-    this.setSpriteAnchorPosition(sprite);
-    this.setSpriteScale(sprite);
-
-    this.width = this.tileSize;
-    this.height = this.tileSize;
   }
 
   private setSpriteAnchorPosition(sprite: Sprite) {
@@ -92,12 +102,5 @@ export class TileView extends Container {
     const sx = this.tileSize / w;
     const sy = this.tileSize / h;
     sprite.scale.set(sx, sy);
-  }
-
-  private setupClickEvent() {
-    this.eventMode = 'static';
-    this.on('pointertap', () => {
-      this.emit('tile:click', { col: this.col, row: this.row });
-    });
   }
 }

@@ -1,4 +1,4 @@
-import { Assets, Container, Sprite } from 'pixi.js';
+import { Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { ASSETS, Z_ORDERS } from '@core/constants';
 import type { PipeKind, Rot } from '@core/types';
 
@@ -8,6 +8,7 @@ export class TileView extends Container {
   private currentKind?: PipeKind;
   private currentRot: Rot = 0;
   private blocked: boolean = false;
+  private highlight?: Graphics;
 
   constructor(
     private tileSize: number = 100,
@@ -80,6 +81,26 @@ export class TileView extends Container {
     this.piece = undefined;
     this.currentKind = undefined;
     this.currentRot = 0;
+  }
+
+  setHighlighted(on: boolean) {
+    if (on) {
+      if (!this.highlight) {
+        const g = new Graphics();
+        g.roundRect(0, 0, this.tileSize, this.tileSize, Math.min(12, this.tileSize * 0.12)).stroke({
+          width: 4,
+          color: 0x2b80ff,
+          alpha: 0.9,
+        });
+        g.position.set(0, 0);
+        this.highlight = g;
+        this.addChild(g);
+        this.setChildIndex(g, this.children.length - 1);
+      }
+      this.highlight.visible = true;
+    } else if (this.highlight) {
+      this.highlight.visible = false;
+    }
   }
 
   // --- Helper Methods ---

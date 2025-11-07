@@ -1,4 +1,4 @@
-import type { PipeKind } from './types';
+import type { Dir, PipeKind } from './types';
 
 export const ALL_PIPE_KINDS = ['empty', 'straight', 'curve', 'cross', 'start'] as const;
 
@@ -21,3 +21,12 @@ export const Z_ORDERS = {
   pieces: 1,
   water: 2,
 } as const;
+
+export const DIRS: readonly Dir[] = ['top', 'right', 'bottom', 'left'] as const;
+
+export const OPPOSED_DIRS: Record<Dir, Dir> = {
+  top: 'bottom',
+  bottom: 'top',
+  left: 'right',
+  right: 'left',
+};

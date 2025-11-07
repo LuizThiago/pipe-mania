@@ -17,7 +17,7 @@ export class Scene extends Container {
 
     const { cols, rows, tileSize } = this.config.grid;
 
-    this.gridView = await this.setupGrid(cols, rows, tileSize);
+    this.gridView = await this.setupGrid(rows, cols, tileSize);
 
     new GameController(this.gridView, this.config);
   }
@@ -32,8 +32,8 @@ export class Scene extends Container {
     ]);
   }
 
-  private async setupGrid(cols: number, rows: number, tileSize: number): Promise<GridView> {
-    const gridView = new GridView(cols, rows, tileSize, this.config.grid.tileGap ?? 5);
+  private async setupGrid(rows: number, cols: number, tileSize: number): Promise<GridView> {
+    const gridView = new GridView(rows, cols, tileSize, this.config.grid.tileGap ?? 5);
     await gridView.init();
     this.addChild(gridView);
     return gridView;

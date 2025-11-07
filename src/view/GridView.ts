@@ -68,6 +68,12 @@ export class GridView extends Container {
     return !!this.blockedTiles[row]?.[col];
   }
 
+  // --- Path Highlighting Methods ---
+  setHighlight(path: Array<{ col: number; row: number }>) {
+    for (const row of this.tiles) for (const t of row) t.setHighlighted(false);
+    for (const n of path) this.tiles[n.row][n.col]?.setHighlighted(true);
+  }
+
   // --- Initialization Methods ---
 
   private setupClickEvent(tile: TileView) {

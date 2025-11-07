@@ -18,8 +18,8 @@ export type GameConfig = z.infer<typeof ConfigSchema>;
 
 export const DefaultConfig: GameConfig = {
   grid: {
-    cols: 6,
-    rows: 6,
+    cols: 9,
+    rows: 7,
     tileSize: 100,
     blockedTilesPercentage: 0.24,
     tileGap: 5,

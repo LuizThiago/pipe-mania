@@ -1,4 +1,5 @@
 import { DIRS } from '@core/constants';
+import { log } from '@core/logger';
 import type { PipeKind, Rot } from '@core/types';
 import type { Dir } from '@core/types';
 
@@ -12,7 +13,8 @@ const BASE_PORTS: Record<Exclude<PipeKind, 'empty'>, Dir[]> = {
 export function getPorts(kind: PipeKind, rot: Rot): Dir[] {
   const dirs = BASE_PORTS[kind as Exclude<PipeKind, 'empty'>];
   if (!dirs) {
-    throw new Error(`Invalid pipe kind: ${kind}`);
+    log.error('Invalid pipe kind:', kind);
+    return [];
   }
 
   return dirs.map(dir => rotateDir(dir, rot));

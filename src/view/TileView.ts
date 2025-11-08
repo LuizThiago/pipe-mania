@@ -1,6 +1,7 @@
 import { Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { ASSETS, Z_ORDERS } from '@core/constants';
 import type { PipeKind, Rot } from '@core/types';
+import { log } from '@core/logger';
 
 export class TileView extends Container {
   private bg!: Sprite;
@@ -56,9 +57,13 @@ export class TileView extends Container {
       return;
     }
 
-    this.currentKind = kind;
-
     const tex = await Assets.load(ASSETS[kind]);
+    if (tex === undefined) {
+      log.error('Asset not found for piece kind:', kind);
+      return;
+    }
+
+    this.currentKind = kind;
 
     if (!this.piece) {
       this.piece = new Sprite(tex);

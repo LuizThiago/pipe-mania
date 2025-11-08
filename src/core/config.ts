@@ -2,9 +2,9 @@ import { z } from 'zod';
 
 export const ConfigSchema = z.object({
   grid: z.object({
-    cols: z.number().int().min(3),
-    rows: z.number().int().min(3),
-    tileSize: z.number().int().min(32).max(256),
+    cols: z.number().int().min(3).default(9),
+    rows: z.number().int().min(3).default(7),
+    tileSize: z.number().int().min(32).max(256).default(100),
     tileGap: z.number().int().min(0).max(200).default(5),
     backgroundPadding: z.number().int().min(0).max(200).default(16),
     backgroundCornerRadius: z.number().int().min(0).max(200).default(12),

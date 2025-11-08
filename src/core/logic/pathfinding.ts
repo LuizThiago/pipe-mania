@@ -1,19 +1,8 @@
 import { OPPOSED_DIRS } from '@core/constants';
 import { getPorts } from '@core/logic/pipes';
-import type { Dir, PipeKind, Rot } from '@core/types';
+import type { Dir, PathNode, TileState } from '@core/types';
 
-export type PathNode = {
-  col: number;
-  row: number;
-};
-
-export type TileState = {
-  kind?: PipeKind;
-  rot?: Rot;
-  blocked?: boolean;
-};
-
-export type GridState = TileState[][];
+type GridState = TileState[][];
 
 export function findLongestConnectedPath(grid: GridState): PathNode[] {
   let best: PathNode[] = [];

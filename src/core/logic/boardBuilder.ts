@@ -1,18 +1,19 @@
-import type { TileState } from '@core/logic/pathfinding';
+import { log } from '@core/logger';
+import type { TileState } from '@core/types';
 
 export type RNG = () => number;
 
-export type BoardDimensions = {
+type BoardDimensions = {
   rows: number;
   cols: number;
 };
 
-export type BoardBuildParams = BoardDimensions & {
+type BoardBuildParams = BoardDimensions & {
   blockedTilesPercentage: number; // Percentage of tiles to block (0.0 to 1.0)
   rng: RNG;
 };
 
-export type BoardBuildResult = {
+type BoardBuildResult = {
   gridData: TileState[][];
   blockedTiles: ReadonlyArray<{ col: number; row: number }>;
 };
@@ -23,12 +24,18 @@ export function buildInitialBoard({
   blockedTilesPercentage,
   rng,
 }: BoardBuildParams): BoardBuildResult {
-  const gridData = createEmptyGrid(rows, cols);
+  if (rows <= 0 || cols <= 0) {
+    log.error('Invalid board dimensions:', { rows, cols });
+    return {
+      gridData: [],
+      blockedTiles: [],
+    };
+  }
 
+  const gridData = createEmptyGrid(rows, cols);
   const totalTiles = rows * cols;
   const maxBlockable = Math.max(totalTiles - 1, 0);
   const targetBlocks = Math.min(Math.floor(totalTiles * blockedTilesPercentage), maxBlockable);
-
   const cells = shuffleCells(getAllCells(rows, cols), rng);
   const blockedTiles = cells.slice(0, targetBlocks);
 

@@ -5,24 +5,17 @@ import { TileView } from './TileView';
 export class GridView extends Container implements GridPort {
   private tiles: TileView[][] = [];
   private blockedTiles: boolean[][] = [];
-  private readonly contentWidth: number;
-  private readonly contentHeight: number;
-  private readonly outerWidth: number;
-  private readonly outerHeight: number;
+  private background?: Graphics;
 
   constructor(
-    private rows: number,
-    private cols: number,
+    private readonly rows: number,
+    private readonly cols: number,
     private tileSize: number,
-    private gap: number = 0,
+    private gap: number,
     private readonly backgroundPadding: number,
     private readonly backgroundCornerRadius: number
   ) {
     super();
-    this.contentWidth = this.cols * this.tileSize + (this.cols - 1) * this.gap;
-    this.contentHeight = this.rows * this.tileSize + (this.rows - 1) * this.gap;
-    this.outerWidth = this.contentWidth + this.backgroundPadding * 2;
-    this.outerHeight = this.contentHeight + this.backgroundPadding * 2;
     this.blockedTiles = Array.from({ length: rows }, () =>
       Array.from({ length: cols }, () => false)
     );
@@ -32,12 +25,12 @@ export class GridView extends Container implements GridPort {
     try {
       const tilePromises: Promise<void>[] = [];
 
-      this.addBackground();
+      this.ensureBackground();
 
       for (let y = 0; y < this.rows; y++) {
         const row: TileView[] = [];
         for (let x = 0; x < this.cols; x++) {
-          const tile = new TileView(this.tileSize, y, x);
+          const tile = new TileView(y, x, this.tileSize);
           tile.position.set(x * (this.tileSize + this.gap), y * (this.tileSize + this.gap));
           this.addChild(tile);
           row.push(tile);
@@ -48,11 +41,25 @@ export class GridView extends Container implements GridPort {
         this.tiles.push(row);
       }
       await Promise.all(tilePromises);
-      this.centerPivot();
+      this.refreshLayout();
     } catch (error) {
       this.removeChildren();
       this.tiles = [];
       throw error;
+    }
+  }
+
+  setLayout(tileSize: number, gap: number) {
+    if (tileSize <= 0) {
+      throw new Error('tileSize must be greater than zero');
+    }
+
+    const hasChanged = this.tileSize !== tileSize || this.gap !== gap;
+    this.tileSize = tileSize;
+    this.gap = gap;
+
+    if (hasChanged) {
+      this.refreshLayout();
     }
   }
 
@@ -88,32 +95,63 @@ export class GridView extends Container implements GridPort {
     for (const n of path) this.tiles[n.row][n.col]?.setHighlighted(true);
   }
 
-  // --- Initialization Methods ---
+  private get contentWidth(): number {
+    return this.cols * this.tileSize + (this.cols - 1) * this.gap;
+  }
+
+  private get contentHeight(): number {
+    return this.rows * this.tileSize + (this.rows - 1) * this.gap;
+  }
+
+  private get outerWidth(): number {
+    return this.contentWidth + this.backgroundPadding * 2;
+  }
+
+  private get outerHeight(): number {
+    return this.contentHeight + this.backgroundPadding * 2;
+  }
+
+  private refreshLayout() {
+    this.updateTilesLayout();
+    this.updateBackground();
+    this.centerPivot();
+  }
+
+  private updateTilesLayout() {
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        const tile = this.tiles[y][x];
+        tile.position.set(x * (this.tileSize + this.gap), y * (this.tileSize + this.gap));
+        tile.setTileSize(this.tileSize);
+      }
+    }
+  }
 
   private centerPivot() {
     this.pivot.set(this.contentWidth / 2, this.contentHeight / 2);
   }
 
-  private addBackground() {
-    const background = new Graphics();
-    const padding = this.backgroundPadding;
-
-    background.beginFill(0xcbe1dc);
-    background.drawRoundedRect(
-      -padding,
-      -padding,
-      this.outerWidth,
-      this.outerHeight,
-      this.backgroundCornerRadius
-    );
-    background.endFill();
-
-    this.addChild(background);
-    this.setChildIndex(background, 0);
+  private ensureBackground() {
+    if (!this.background) {
+      this.background = new Graphics();
+      this.addChildAt(this.background, 0);
+    }
   }
 
-  getOuterSize() {
-    return { width: this.outerWidth, height: this.outerHeight };
+  private updateBackground() {
+    this.ensureBackground();
+    this.background!.clear();
+    const padding = this.backgroundPadding;
+
+    this.background!.beginFill(0xcbe1dc)
+      .drawRoundedRect(
+        -padding,
+        -padding,
+        this.outerWidth,
+        this.outerHeight,
+        this.backgroundCornerRadius
+      )
+      .endFill();
   }
 
   private setupClickEvent(tile: TileView) {

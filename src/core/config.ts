@@ -4,10 +4,11 @@ export const ConfigSchema = z.object({
   grid: z.object({
     cols: z.number().int().min(3).default(9),
     rows: z.number().int().min(3).default(7),
-    tileSize: z.number().int().min(32).max(256).default(100),
     tileGap: z.number().int().min(0).max(200).default(5),
     backgroundPadding: z.number().int().min(0).max(200).default(16),
     backgroundCornerRadius: z.number().int().min(0).max(200).default(12),
+    maxWidthRatio: z.number().min(0.1).max(1).default(0.75),
+    maxHeightRatio: z.number().min(0.1).max(1).default(0.75),
   }),
   gameplay: z.object({
     blockedTilesPercentage: z.number().min(0).max(1).default(0.24),
@@ -22,10 +23,11 @@ export const DefaultConfig: GameConfig = {
   grid: {
     cols: 9,
     rows: 7,
-    tileSize: 100,
     tileGap: 12,
     backgroundPadding: 16,
     backgroundCornerRadius: 12,
+    maxWidthRatio: 0.75,
+    maxHeightRatio: 0.75,
   },
   gameplay: {
     blockedTilesPercentage: 0.24,

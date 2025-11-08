@@ -12,9 +12,9 @@ export class TileView extends Container {
   private highlight?: Graphics;
 
   constructor(
-    private tileSize: number = 100,
     private row: number,
-    private col: number
+    private col: number,
+    private tileSize: number
   ) {
     super();
   }
@@ -91,21 +91,30 @@ export class TileView extends Container {
   setHighlighted(on: boolean) {
     if (on) {
       if (!this.highlight) {
-        const g = new Graphics();
-        g.roundRect(0, 0, this.tileSize, this.tileSize, Math.min(12, this.tileSize * 0.12)).stroke({
-          width: 4,
-          color: 0x2b80ff,
-          alpha: 0.9,
-        });
-        g.position.set(0, 0);
-        this.highlight = g;
-        this.addChild(g);
-        this.setChildIndex(g, this.children.length - 1);
+        this.highlight = this.createHighlight();
+        this.addChild(this.highlight);
+        this.setChildIndex(this.highlight, this.children.length - 1);
       }
       this.highlight.visible = true;
     } else if (this.highlight) {
       this.highlight.visible = false;
     }
+  }
+
+  setTileSize(size: number) {
+    if (this.tileSize === size) {
+      return;
+    }
+
+    this.tileSize = size;
+
+    if (this.bg) {
+      this.setupSpriteToTile(this.bg);
+    }
+    if (this.piece) {
+      this.setupSpriteToTile(this.piece);
+    }
+    this.refreshHighlight();
   }
 
   // --- Helper Methods ---
@@ -115,6 +124,32 @@ export class TileView extends Container {
 
     this.currentRot = rot;
     this.piece.rotation = (Math.PI / 2) * rot;
+  }
+
+  private createHighlight(): Graphics {
+    const g = new Graphics();
+    this.drawHighlight(g);
+    g.position.set(0, 0);
+    return g;
+  }
+
+  private refreshHighlight() {
+    if (!this.highlight) {
+      return;
+    }
+
+    this.highlight.clear();
+    this.drawHighlight(this.highlight);
+  }
+
+  private drawHighlight(target: Graphics) {
+    target
+      .roundRect(0, 0, this.tileSize, this.tileSize, Math.min(12, this.tileSize * 0.12))
+      .stroke({
+        width: Math.max(2, this.tileSize * 0.04),
+        color: 0x2b80ff,
+        alpha: 0.9,
+      });
   }
 
   private setSpriteAnchorPosition(sprite: Sprite) {

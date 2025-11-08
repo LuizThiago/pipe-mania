@@ -7,6 +7,8 @@ export async function createPixiApp(mount: HTMLElement) {
     resizeTo: window,
     background: '#FAFAFA',
   });
+
+  app.canvas.style.position = 'absolute';
   mount.appendChild(app.canvas as HTMLCanvasElement);
 
   const scene = new Scene();

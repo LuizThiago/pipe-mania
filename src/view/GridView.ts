@@ -1,18 +1,28 @@
-import { Container } from 'pixi.js';
+import { Container, Graphics } from 'pixi.js';
 import type { GridPort } from '@core/ports/GridPort';
 import { TileView } from './TileView';
 
 export class GridView extends Container implements GridPort {
   private tiles: TileView[][] = [];
   private blockedTiles: boolean[][] = [];
+  private readonly contentWidth: number;
+  private readonly contentHeight: number;
+  private readonly outerWidth: number;
+  private readonly outerHeight: number;
 
   constructor(
     private rows: number,
     private cols: number,
     private tileSize: number,
-    private gap: number = 0
+    private gap: number = 0,
+    private readonly backgroundPadding: number,
+    private readonly backgroundCornerRadius: number
   ) {
     super();
+    this.contentWidth = this.cols * this.tileSize + (this.cols - 1) * this.gap;
+    this.contentHeight = this.rows * this.tileSize + (this.rows - 1) * this.gap;
+    this.outerWidth = this.contentWidth + this.backgroundPadding * 2;
+    this.outerHeight = this.contentHeight + this.backgroundPadding * 2;
     this.blockedTiles = Array.from({ length: rows }, () =>
       Array.from({ length: cols }, () => false)
     );
@@ -21,6 +31,8 @@ export class GridView extends Container implements GridPort {
   async init() {
     try {
       const tilePromises: Promise<void>[] = [];
+
+      this.addBackground();
 
       for (let y = 0; y < this.rows; y++) {
         const row: TileView[] = [];
@@ -36,6 +48,7 @@ export class GridView extends Container implements GridPort {
         this.tiles.push(row);
       }
       await Promise.all(tilePromises);
+      this.centerPivot();
     } catch (error) {
       this.removeChildren();
       this.tiles = [];
@@ -76,6 +89,32 @@ export class GridView extends Container implements GridPort {
   }
 
   // --- Initialization Methods ---
+
+  private centerPivot() {
+    this.pivot.set(this.contentWidth / 2, this.contentHeight / 2);
+  }
+
+  private addBackground() {
+    const background = new Graphics();
+    const padding = this.backgroundPadding;
+
+    background.beginFill(0xcbe1dc);
+    background.drawRoundedRect(
+      -padding,
+      -padding,
+      this.outerWidth,
+      this.outerHeight,
+      this.backgroundCornerRadius
+    );
+    background.endFill();
+
+    this.addChild(background);
+    this.setChildIndex(background, 0);
+  }
+
+  getOuterSize() {
+    return { width: this.outerWidth, height: this.outerHeight };
+  }
 
   private setupClickEvent(tile: TileView) {
     tile.on('tile:click', payload => {

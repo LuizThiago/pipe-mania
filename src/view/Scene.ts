@@ -33,9 +33,25 @@ export class Scene extends Container {
   }
 
   private async setupGrid(rows: number, cols: number, tileSize: number): Promise<GridView> {
-    const gridView = new GridView(rows, cols, tileSize, this.config.grid.tileGap ?? 5);
+    const gridView = new GridView(
+      rows,
+      cols,
+      tileSize,
+      this.config.grid.tileGap ?? 5,
+      this.config.grid.backgroundPadding ?? 16,
+      this.config.grid.backgroundCornerRadius ?? 12
+    );
     await gridView.init();
+    this.positionGridAtCenter(gridView);
     this.addChild(gridView);
     return gridView;
+  }
+
+  private positionGridAtCenter(gridView: GridView) {
+    gridView.position.set(0, 0);
+  }
+
+  onViewportResize(width: number, height: number) {
+    this.position.set(width / 2, height / 2);
   }
 }

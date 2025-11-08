@@ -33,7 +33,8 @@ export class GameController {
   // --- Board Initialization Methods ---
 
   private buildBoard() {
-    const { rows, cols, blockedTilesPercentage } = this.config.grid;
+    const { rows, cols } = this.config.grid;
+    const { blockedTilesPercentage } = this.config.gameplay;
     const { gridData, blockedTiles } = buildInitialBoard({
       rows,
       cols,

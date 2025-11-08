@@ -5,10 +5,12 @@ export const ConfigSchema = z.object({
     cols: z.number().int().min(3),
     rows: z.number().int().min(3),
     tileSize: z.number().int().min(32).max(256),
-    blockedTilesPercentage: z.number().min(0).max(0.5).default(0.24),
     tileGap: z.number().int().min(0).max(200).default(5),
+    backgroundPadding: z.number().int().min(0).max(200).default(16),
+    backgroundCornerRadius: z.number().int().min(0).max(200).default(12),
   }),
   gameplay: z.object({
+    blockedTilesPercentage: z.number().min(0).max(1).default(0.24),
     allowedPieces: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
   }),
@@ -21,10 +23,12 @@ export const DefaultConfig: GameConfig = {
     cols: 9,
     rows: 7,
     tileSize: 100,
-    blockedTilesPercentage: 0.24,
-    tileGap: 5,
+    tileGap: 12,
+    backgroundPadding: 16,
+    backgroundCornerRadius: 12,
   },
   gameplay: {
+    blockedTilesPercentage: 0.24,
     allowedPieces: ['straight', 'curve', 'cross'],
   },
 };

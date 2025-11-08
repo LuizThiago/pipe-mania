@@ -2,7 +2,7 @@ import type { Dir, PipeKind } from './types';
 
 export const ALL_PIPE_KINDS = ['empty', 'straight', 'curve', 'cross', 'start'] as const;
 
-export const RANDOMIZABLE_PIECE_KINDS = ALL_PIPE_KINDS.filter(
+export const RANDOMIZABLE_PIPE_KINDS = ALL_PIPE_KINDS.filter(
   (kind): kind is Exclude<PipeKind, 'empty' | 'start'> => kind !== 'empty' && kind !== 'start'
 ) as readonly Exclude<PipeKind, 'empty' | 'start'>[];
 
@@ -18,7 +18,7 @@ export const ASSETS = {
 
 export const Z_ORDERS = {
   tiles_bg: 0,
-  pieces: 1,
+  pipes: 1,
   water: 2,
 } as const;
 

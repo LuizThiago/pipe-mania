@@ -13,7 +13,8 @@ export class GridView extends Container implements GridPort {
     private tileSize: number,
     private gap: number,
     private readonly backgroundPadding: number,
-    private readonly backgroundCornerRadius: number
+    private readonly backgroundCornerRadius: number,
+    private readonly backgroundColor: number
   ) {
     super();
     this.blockedTiles = Array.from({ length: rows }, () =>
@@ -49,6 +50,8 @@ export class GridView extends Container implements GridPort {
     }
   }
 
+  // --- Layout Methods ---
+
   setLayout(tileSize: number, gap: number) {
     if (tileSize <= 0) {
       throw new Error('tileSize must be greater than zero');
@@ -61,6 +64,49 @@ export class GridView extends Container implements GridPort {
     if (hasChanged) {
       this.refreshLayout();
     }
+  }
+
+  private refreshLayout() {
+    this.updateTilesLayout();
+    this.updateBackground();
+    this.centerPivot();
+  }
+
+  private updateTilesLayout() {
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        const tile = this.tiles[y][x];
+        tile.position.set(x * (this.tileSize + this.gap), y * (this.tileSize + this.gap));
+        tile.setTileSize(this.tileSize);
+      }
+    }
+  }
+
+  private centerPivot() {
+    this.pivot.set(this.contentWidth / 2, this.contentHeight / 2);
+  }
+
+  private ensureBackground() {
+    if (!this.background) {
+      this.background = new Graphics();
+      this.addChildAt(this.background, 0);
+    }
+  }
+
+  private updateBackground() {
+    this.ensureBackground();
+    this.background!.clear();
+    const padding = this.backgroundPadding;
+
+    this.background!.beginFill(this.backgroundColor)
+      .drawRoundedRect(
+        -padding,
+        -padding,
+        this.outerWidth,
+        this.outerHeight,
+        this.backgroundCornerRadius
+      )
+      .endFill();
   }
 
   // --- Getters ---
@@ -111,48 +157,7 @@ export class GridView extends Container implements GridPort {
     return this.contentHeight + this.backgroundPadding * 2;
   }
 
-  private refreshLayout() {
-    this.updateTilesLayout();
-    this.updateBackground();
-    this.centerPivot();
-  }
-
-  private updateTilesLayout() {
-    for (let y = 0; y < this.rows; y++) {
-      for (let x = 0; x < this.cols; x++) {
-        const tile = this.tiles[y][x];
-        tile.position.set(x * (this.tileSize + this.gap), y * (this.tileSize + this.gap));
-        tile.setTileSize(this.tileSize);
-      }
-    }
-  }
-
-  private centerPivot() {
-    this.pivot.set(this.contentWidth / 2, this.contentHeight / 2);
-  }
-
-  private ensureBackground() {
-    if (!this.background) {
-      this.background = new Graphics();
-      this.addChildAt(this.background, 0);
-    }
-  }
-
-  private updateBackground() {
-    this.ensureBackground();
-    this.background!.clear();
-    const padding = this.backgroundPadding;
-
-    this.background!.beginFill(0xcbe1dc)
-      .drawRoundedRect(
-        -padding,
-        -padding,
-        this.outerWidth,
-        this.outerHeight,
-        this.backgroundCornerRadius
-      )
-      .endFill();
-  }
+  // --- Event Setup Methods ---
 
   private setupClickEvent(tile: TileView) {
     tile.on('tile:click', payload => {

@@ -5,7 +5,7 @@ import { log } from '@core/logger';
 
 export class TileView extends Container {
   private bg!: Sprite;
-  private piece?: Sprite;
+  private pipe?: Sprite;
   private currentKind?: PipeKind;
   private currentRot: Rot = 0;
   private blocked: boolean = false;
@@ -47,43 +47,43 @@ export class TileView extends Container {
     this.bg.visible = !this.blocked;
   }
 
-  async setPiece(kind: PipeKind = 'empty', rot: Rot = 0) {
+  async setPipe(kind: PipeKind = 'empty', rot: Rot = 0) {
     if (this.currentKind === kind && this.currentRot === rot) {
       return;
     }
 
     if (kind === 'empty') {
-      this.clearPiece();
+      this.clearPipe();
       return;
     }
 
     const tex = await Assets.load(ASSETS[kind]);
     if (tex === undefined) {
-      log.error('Asset not found for piece kind:', kind);
+      log.error('Asset not found for pipe kind:', kind);
       return;
     }
 
     this.currentKind = kind;
 
-    if (!this.piece) {
-      this.piece = new Sprite(tex);
-      this.setupSpriteToTile(this.piece);
-      this.addChild(this.piece);
+    if (!this.pipe) {
+      this.pipe = new Sprite(tex);
+      this.setupSpriteToTile(this.pipe);
+      this.addChild(this.pipe);
       this.setChildIndex(this.bg, Z_ORDERS.tiles_bg);
-      this.setChildIndex(this.piece, Z_ORDERS.pieces);
+      this.setChildIndex(this.pipe, Z_ORDERS.pipes);
     } else {
-      this.piece.texture = tex;
+      this.pipe.texture = tex;
     }
 
     this.applyRotation(rot);
   }
 
-  clearPiece(): void {
-    if (!this.piece) return;
+  clearPipe(): void {
+    if (!this.pipe) return;
 
-    this.removeChild(this.piece);
-    this.piece.destroy();
-    this.piece = undefined;
+    this.removeChild(this.pipe);
+    this.pipe.destroy();
+    this.pipe = undefined;
     this.currentKind = undefined;
     this.currentRot = 0;
   }
@@ -111,8 +111,8 @@ export class TileView extends Container {
     if (this.bg) {
       this.setupSpriteToTile(this.bg);
     }
-    if (this.piece) {
-      this.setupSpriteToTile(this.piece);
+    if (this.pipe) {
+      this.setupSpriteToTile(this.pipe);
     }
     this.refreshHighlight();
   }
@@ -120,10 +120,10 @@ export class TileView extends Container {
   // --- Helper Methods ---
 
   private applyRotation(rot: Rot): void {
-    if (!this.piece || this.currentRot === rot) return;
+    if (!this.pipe || this.currentRot === rot) return;
 
     this.currentRot = rot;
-    this.piece.rotation = (Math.PI / 2) * rot;
+    this.pipe.rotation = (Math.PI / 2) * rot;
   }
 
   private createHighlight(): Graphics {

@@ -1,11 +1,16 @@
 import { Assets, Container } from 'pixi.js';
-import { GridView } from './GridView';
 import { loadConfig } from '@core/config';
 import { GameController } from '@core/controller/GameController';
+import { GridView } from './GridView';
+import { QueueView } from './QueueView';
+import { log } from '@core/logger';
+import { calculateSceneLayout } from './layout/sceneLayout';
+import { parseColor } from './utils/color';
 
 export class Scene extends Container {
   private config = loadConfig();
   private gridView?: GridView;
+  private queueView?: QueueView;
   private lastViewport?: { width: number; height: number };
 
   constructor() {
@@ -18,14 +23,17 @@ export class Scene extends Container {
 
     const { cols, rows } = this.config.grid;
 
-    this.gridView = await this.setupGrid(rows, cols);
+    this.gridView = await this.createGrid(rows, cols);
 
-    new GameController(this.gridView, this.config);
+    const gameController = new GameController(this.gridView, this.config);
+    this.createQueue(gameController);
 
     if (this.lastViewport) {
       this.applyResponsiveLayout(this.lastViewport.width, this.lastViewport.height);
     }
   }
+
+  // --- Initialization Methods ---
 
   private async loadAssets() {
     await Assets.load([
@@ -37,7 +45,7 @@ export class Scene extends Container {
     ]);
   }
 
-  private async setupGrid(rows: number, cols: number): Promise<GridView> {
+  private async createGrid(rows: number, cols: number): Promise<GridView> {
     const initialTileSize = this.calculateTileSize(
       this.lastViewport?.width ?? 1024,
       this.lastViewport?.height ?? 768
@@ -48,17 +56,43 @@ export class Scene extends Container {
       initialTileSize,
       this.config.grid.tileGap ?? 5,
       this.config.grid.backgroundPadding ?? 16,
-      this.config.grid.backgroundCornerRadius ?? 12
+      this.config.grid.backgroundCornerRadius ?? 12,
+      parseColor(this.config.grid.backgroundColor ?? '#CBE1DC')
     );
     await gridView.init();
-    this.positionGridAtCenter(gridView);
     this.addChild(gridView);
     return gridView;
   }
 
-  private positionGridAtCenter(gridView: GridView) {
-    gridView.position.set(0, 0);
+  private async createQueue(gameController: GameController) {
+    const visibleSlots = this.getVisibleQueueSlots();
+    const qGap = this.config.queue.queueGap;
+    const pad = this.config.grid.backgroundPadding ?? 16;
+    const radius = this.config.grid.backgroundCornerRadius ?? 12;
+
+    const tileSize = this.calculateTileSize(
+      this.lastViewport?.width ?? 1024,
+      this.lastViewport?.height ?? 768
+    );
+
+    this.queueView = new QueueView(
+      visibleSlots,
+      tileSize,
+      qGap,
+      pad,
+      radius,
+      parseColor(this.config.queue.queueBackgroundColor ?? '#DDEEEF')
+    );
+    await this.queueView.init();
+
+    this.addChild(this.queueView);
+
+    gameController.onPipesQueueChange = queuePipes => {
+      this.queueView?.setQueue(queuePipes);
+    };
   }
+
+  // --- Layout Methods ---
 
   onViewportResize(width: number, height: number) {
     this.lastViewport = { width, height };
@@ -66,14 +100,7 @@ export class Scene extends Container {
     this.applyResponsiveLayout(width, height);
   }
 
-  private applyResponsiveLayout(width: number, height: number) {
-    if (!this.gridView) {
-      return;
-    }
-
-    const tileSize = this.calculateTileSize(width, height);
-    this.gridView.setLayout(tileSize, this.config.grid.tileGap ?? 5);
-  }
+  // --- Layout Helpers ---
 
   private calculateTileSize(width: number, height: number) {
     const { cols, rows } = this.config.grid;
@@ -88,5 +115,42 @@ export class Scene extends Container {
 
     const tileSize = Math.max(16, Math.min(sizeFromWidth, sizeFromHeight));
     return tileSize;
+  }
+
+  private applyResponsiveLayout(width: number, height: number) {
+    const tileSize = this.calculateTileSize(width, height);
+    const gap = this.config.grid.tileGap ?? 5;
+
+    // Grid
+    if (!this.gridView) {
+      log.error('Grid view not found');
+      return;
+    }
+
+    this.gridView.setLayout(tileSize, gap);
+
+    // Queue
+    if (!this.queueView) {
+      log.error('Queue view not found');
+      return;
+    }
+    const visibleSlots = this.getVisibleQueueSlots();
+    this.queueView.setVisibleSlots(visibleSlots);
+    this.queueView.setLayout(tileSize, this.config.queue.queueGap);
+
+    const layout = calculateSceneLayout(
+      tileSize,
+      this.config.grid,
+      this.config.queue,
+      visibleSlots
+    );
+    this.gridView.position.set(layout.gridPosition.x, layout.gridPosition.y);
+    this.queueView.position.set(layout.queuePosition.x, layout.queuePosition.y);
+  }
+
+  private getVisibleQueueSlots(): number {
+    const size = this.config.queue.queueSize;
+    const maxVisible = this.config.queue.maxVisibleTiles ?? size;
+    return Math.max(1, Math.min(size, maxVisible));
   }
 }

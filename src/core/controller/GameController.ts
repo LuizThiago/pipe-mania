@@ -2,41 +2,60 @@ import type { GameConfig } from '@core/config';
 import type { GridTileSelectedPayload } from '@core/events';
 import { log } from '@core/logger';
 import { buildInitialBoard } from '@core/logic/boardBuilder';
-import type { RNG as BoardRng } from '@core/logic/boardBuilder';
+import type { RNG } from '@core/logic/boardBuilder';
 import { findLongestConnectedPath } from '@core/logic/pathfinding';
-import type { PathNode, TileState, Rot } from '@core/types';
+import type { PathNode, TileState } from '@core/types';
 import type { GridPort } from '@core/ports/GridPort';
+import { PipesQueue, type PipeQueueItem } from '@core/logic/pipesQueue';
+import type { TileView } from '@view/TileView';
 
-type RNG = BoardRng; // Still not deterministic, i'll fix it later...
-type AllowedConfigPiece = GameConfig['gameplay']['allowedPieces'][number];
-type PlaceablePiece = Exclude<AllowedConfigPiece, 'start'>;
+type AllowedConfigPipe = GameConfig['gameplay']['allowedPipes'][number];
+type PlaceablePipe = Exclude<AllowedConfigPipe, 'start'>;
 
 export class GameController {
-  private readonly placeablePieces: ReadonlyArray<PlaceablePiece>;
+  private readonly placeablePipes: ReadonlyArray<PlaceablePipe>;
+  private readonly pipesQueue: PipesQueue;
   private gridData: TileState[][] = [];
+  private _onPipesQueueChange?: (q: readonly PipeQueueItem[]) => void;
+  set onPipesQueueChange(cb: ((q: readonly PipeQueueItem[]) => void) | undefined) {
+    this._onPipesQueueChange = cb;
+    if (cb) cb(this.pipesQueue.snapshotPipes());
+  }
 
   constructor(
     private readonly grid: GridPort,
     private config: GameConfig,
     private rng: RNG = Math.random
   ) {
-    this.placeablePieces = this.config.gameplay.allowedPieces.filter(
-      (p): p is PlaceablePiece => p !== 'start'
-    );
-    if (this.placeablePieces.length === 0) {
-      log.error('At least one placeable piece (other than "start") must be configured');
-      throw new Error('At least one placeable piece (other than "start") must be configured');
-    }
-
     if (!this.validateConfig()) {
       log.error('Invalid game configuration');
       throw new Error('Invalid game configuration');
     }
+
+    this.placeablePipes = this.resolvePlaceablePipes();
+    this.pipesQueue = this.createPipesQueue();
+
     this.buildBoard();
     this.subscribeToEvents();
+
+    this._onPipesQueueChange?.(this.pipesQueue.snapshotPipes());
   }
 
   // --- Board Initialization Methods ---
+
+  private resolvePlaceablePipes(): ReadonlyArray<PlaceablePipe> {
+    const pipe = this.config.gameplay.allowedPipes.filter((p): p is PlaceablePipe => p !== 'start');
+    if (pipe.length === 0) {
+      log.error('At least one allowed pipe (other than "start") must be configured');
+      throw new Error('At least one allowed pipe (other than "start") must be configured');
+    }
+
+    return pipe;
+  }
+
+  private createPipesQueue(): PipesQueue {
+    return new PipesQueue(this.config.queue.queueSize, this.rng, this.placeablePipes);
+  }
 
   private buildBoard() {
     const { rows, cols } = this.config.grid;
@@ -62,40 +81,16 @@ export class GameController {
   // --- Tile Interaction Methods ---
 
   private readonly handleTileSelected = async ({ col, row, tile }: GridTileSelectedPayload) => {
-    if (!this.canPlace(col, row)) {
+    if (!this.canPlacePipe(col, row)) {
       return;
     }
 
-    const piece = this.getRandomPiece();
-    const rotation = this.getRandomRotation();
-
-    try {
-      await tile.setPiece(piece, rotation);
-
-      this.gridData[row][col].kind = piece;
-      this.gridData[row][col].rot = rotation;
-
+    if (await this.tryPlacePipe(col, row, tile)) {
       this.onPlace();
-    } catch (error) {
-      log.error('Failed to place piece:', error);
     }
   };
 
-  private getRandomPiece(): PlaceablePiece {
-    if (this.placeablePieces.length === 0) {
-      throw new Error('No placeable pieces available');
-    }
-
-    const index = Math.floor(this.rng() * this.placeablePieces.length);
-    return this.placeablePieces[index];
-  }
-
-  private getRandomRotation(): Rot {
-    const n = Math.floor(this.rng() * 4);
-    return n as Rot;
-  }
-
-  private canPlace(col: number, row: number): boolean {
+  private canPlacePipe(col: number, row: number): boolean {
     if (row < 0 || row >= this.gridData.length || col < 0 || col >= this.gridData[row].length) {
       log.error('Invalid grid position');
       return false;
@@ -104,13 +99,36 @@ export class GameController {
     return !this.gridData[row][col].blocked;
   }
 
+  private async tryPlacePipe(col: number, row: number, tile: TileView): Promise<boolean> {
+    const pipe = this.pipesQueue.peekPipe();
+    if (!pipe) {
+      log.error('No pipes available to place');
+      return false;
+    }
+
+    try {
+      await tile.setPipe(pipe.kind, pipe.rot);
+
+      this.gridData[row][col].kind = pipe.kind;
+      this.gridData[row][col].rot = pipe.rot;
+
+      this.pipesQueue.popAndPushPipe();
+      this._onPipesQueueChange?.(this.pipesQueue.snapshotPipes());
+
+      return true;
+    } catch (error) {
+      log.error('Failed to place pipe:', error);
+      return false;
+    }
+  }
+
   private onPlace() {
     const best = findLongestConnectedPath(this.gridData);
     this.applyHighlight(best);
     if (best.length > 0) {
-      console.log('best count:', best.length);
+      log.info('best count:', best.length);
     } else {
-      console.log('no path found');
+      log.info('no path found');
     }
   }
 
@@ -136,5 +154,10 @@ export class GameController {
     }
 
     return true;
+  }
+
+  // --- Pipes Queue Methods ---
+  getQueueSnapshot() {
+    return this.pipesQueue.snapshotPipes();
   }
 }

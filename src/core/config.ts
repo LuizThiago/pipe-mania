@@ -2,19 +2,34 @@ import { z } from 'zod';
 
 export const ConfigSchema = z.object({
   grid: z.object({
+    // Grid configuration
     cols: z.number().int().min(3).default(9),
     rows: z.number().int().min(3).default(7),
     tileGap: z.number().int().min(0).max(200).default(5),
-    backgroundPadding: z.number().int().min(0).max(200).default(16),
-    backgroundCornerRadius: z.number().int().min(0).max(200).default(12),
     maxWidthRatio: z.number().min(0.1).max(1).default(0.75),
     maxHeightRatio: z.number().min(0.1).max(1).default(0.75),
+
+    // Background configuration
+    backgroundPadding: z.number().int().min(0).max(200).default(16),
+    backgroundCornerRadius: z.number().int().min(0).max(200).default(12),
+    backgroundColor: z.string().default('#CBE1DC'),
   }),
   gameplay: z.object({
     blockedTilesPercentage: z.number().min(0).max(1).default(0.24),
-    allowedPieces: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
+    allowedPipes: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
   }),
+  queue: z
+    .object({
+      queueSize: z.number().int().min(1).max(12).default(6),
+      maxVisibleTiles: z.number().int().min(1).max(12).default(6),
+      queueGap: z.number().int().min(0).max(200).default(12),
+      queueTopMargin: z.number().int().min(0).max(200).default(16),
+      queueBackgroundColor: z.string().default('#CBE1DC'),
+    })
+    .refine(data => data.maxVisibleTiles <= data.queueSize, {
+      message: 'maxVisibleTiles cannot exceed queueSize',
+    }),
 });
 
 export type GameConfig = z.infer<typeof ConfigSchema>;
@@ -28,10 +43,18 @@ export const DefaultConfig: GameConfig = {
     backgroundCornerRadius: 12,
     maxWidthRatio: 0.75,
     maxHeightRatio: 0.75,
+    backgroundColor: '#CBE1DC',
   },
   gameplay: {
     blockedTilesPercentage: 0.24,
-    allowedPieces: ['straight', 'curve', 'cross'],
+    allowedPipes: ['straight', 'curve', 'cross'],
+  },
+  queue: {
+    queueSize: 6,
+    maxVisibleTiles: 6,
+    queueGap: 12,
+    queueTopMargin: 16,
+    queueBackgroundColor: '#CBE1DC',
   },
 };
 

@@ -9,6 +9,8 @@ import type { GridPort } from '@core/ports/GridPort';
 import { PipesQueue, type PipeQueueItem } from '@core/logic/pipesQueue';
 import { getPorts } from '@core/logic/pipes';
 import { OPPOSED_DIRS } from '@core/constants';
+import { ScoreController } from './ScoreController';
+import type { FlowCompletionPayload, FlowTerminationReason } from '@core/types';
 
 type AllowedConfigPipe = GameConfig['gameplay']['allowedPipes'][number];
 type PlaceablePipe = Exclude<AllowedConfigPipe, 'start'>;
@@ -22,6 +24,7 @@ export class GameController {
   private isFlowing = false;
   private activeAnimationFrame?: number;
   private readonly fillDurationMs: number;
+  private readonly scoreController: ScoreController;
   private _onPipesQueueChange?: (q: readonly PipeQueueItem[]) => void;
   set onPipesQueueChange(cb: ((q: readonly PipeQueueItem[]) => void) | undefined) {
     this._onPipesQueueChange = cb;
@@ -42,6 +45,7 @@ export class GameController {
     this.placeablePipes = this.resolvePlaceablePipes();
     this.pipesQueue = this.createPipesQueue();
     this.fillDurationMs = this.config.water.fillDurationMs ?? 1000;
+    this.scoreController = new ScoreController(this.config.gameplay.scoring);
   }
 
   async init() {
@@ -197,11 +201,16 @@ export class GameController {
       return false;
     }
 
+    const state = this.gridData[row]?.[col];
+    const wasReplacement = !!state?.kind && state.kind !== 'empty' && state.kind !== 'start';
+
     try {
       await tile.setPipe(pipe.kind, pipe.rot);
 
       this.gridData[row][col].kind = pipe.kind;
       this.gridData[row][col].rot = pipe.rot;
+
+      this.scoreController.handlePipePlacement({ wasReplacement });
 
       this.pipesQueue.popAndPushPipe();
       this._onPipesQueueChange?.(this.pipesQueue.snapshotPipes());
@@ -250,9 +259,11 @@ export class GameController {
 
     this.isFlowing = true;
     this.hasFlowFrom.clear();
+    this.scoreController.beginFlow();
 
     let current: TileCoordinate | undefined = { ...this.startTile };
     let incoming: Dir | undefined = undefined;
+    let terminationReason: FlowTerminationReason = 'manualStop';
 
     // The traversal walks the network tile by tile, relying on `incoming` and the
     // historical flow map to prevent oscillations when a pipe has more than one
@@ -262,6 +273,7 @@ export class GameController {
       const state = this.gridData[current.row]?.[current.col];
       if (!state || !state.kind || state.kind === 'empty') {
         log.info('Water flow stopped: missing pipe');
+        terminationReason = 'missingPipe';
         break;
       }
 
@@ -271,13 +283,22 @@ export class GameController {
       const exit = this.determineExitDirection(state.kind, state.rot ?? 0, incoming, filledDirs);
       if (!exit) {
         log.info('Water flow stopped: no valid exit');
+        if (state.kind !== 'start') {
+          this.scoreController.registerFlowStep({ tile: current, kind: state.kind });
+        }
+        terminationReason = 'noExit';
         break;
       }
 
       await this.animateTileFill(current.col, current.row, incoming, exit);
 
       if (!this.isFlowing) {
+        terminationReason = 'manualStop';
         break;
+      }
+
+      if (state.kind !== 'start') {
+        this.scoreController.registerFlowStep({ tile: current, kind: state.kind });
       }
 
       filledDirs.add(exit);
@@ -286,6 +307,7 @@ export class GameController {
       const next = this.getNextCoordinates(current, exit);
       if (!next) {
         log.info('Water flow stopped: reached grid boundary');
+        terminationReason = 'outOfBounds';
         break;
       }
 
@@ -293,6 +315,7 @@ export class GameController {
       const incomingDir = this.getOpposite(exit);
       if (!this.canEnterTile(nextState, incomingDir)) {
         log.info('Water flow stopped: pipeline not connected');
+        terminationReason = 'disconnected';
         break;
       }
 
@@ -306,6 +329,7 @@ export class GameController {
     }
 
     this.isFlowing = false;
+    this.scoreController.completeFlow(terminationReason);
   }
 
   private determineExitDirection(
@@ -423,5 +447,19 @@ export class GameController {
   // --- Pipes Queue Methods ---
   getQueueSnapshot() {
     return this.pipesQueue.snapshotPipes();
+  }
+
+  // --- Score Controller Methods ---
+
+  set onScoreChange(listener: ((score: number) => void) | undefined) {
+    this.scoreController.onScoreChange = listener;
+  }
+
+  set onFlowComplete(listener: ((payload: FlowCompletionPayload) => void) | undefined) {
+    this.scoreController.onFlowComplete = listener;
+  }
+
+  getScore(): number {
+    return this.scoreController.getScore();
   }
 }

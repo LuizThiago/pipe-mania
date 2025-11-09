@@ -18,3 +18,17 @@ export type TileState = {
   rot?: Rot;
   blocked?: boolean;
 };
+
+export type FlowTerminationReason =
+  | 'missingPipe'
+  | 'noExit'
+  | 'outOfBounds'
+  | 'disconnected'
+  | 'manualStop';
+
+export type FlowCompletionPayload = {
+  reason: FlowTerminationReason;
+  totalTraversed: number;
+  targetLength: number;
+  goalAchieved: boolean;
+};

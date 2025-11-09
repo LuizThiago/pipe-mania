@@ -18,6 +18,12 @@ export const ConfigSchema = z.object({
     blockedTilesPercentage: z.number().min(0).max(1).default(0.24),
     allowedPipes: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
+    scoring: z.object({
+      flowTileReward: z.number().int().min(0).default(100),
+      replacementPenalty: z.number().int().min(0).default(50),
+      targetFlowLength: z.number().int().min(1).default(12),
+      allowNegativeScore: z.boolean().default(false),
+    }),
   }),
   water: z.object({
     fillProgress: z.number().min(0).max(1).default(0),
@@ -56,6 +62,12 @@ export const DefaultConfig: GameConfig = {
   gameplay: {
     blockedTilesPercentage: 0.24,
     allowedPipes: ['straight', 'curve', 'cross'],
+    scoring: {
+      flowTileReward: 100,
+      replacementPenalty: 50,
+      targetFlowLength: 12,
+      allowNegativeScore: false,
+    },
   },
   water: {
     fillProgress: 0,

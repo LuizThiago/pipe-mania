@@ -1,4 +1,5 @@
 import { Assets, Container } from 'pixi.js';
+import type { DestroyOptions } from 'pixi.js';
 import { loadConfig } from '@core/config';
 import { GameController } from '@core/controller/GameController';
 import { GridView } from './GridView';
@@ -16,13 +17,13 @@ export class Scene extends Container {
   private hudView?: HudView;
   private hudTopReserve: number;
   private readonly contentRoot: Container;
+  private autoStartFrameId?: number;
 
   constructor() {
     super();
     this.contentRoot = new Container();
     this.addChild(this.contentRoot);
     this.hudTopReserve = this.config.hud?.minTopReserve ?? 160;
-    window.addEventListener('keydown', this.onKeyDown);
     this.init();
   }
 
@@ -41,6 +42,8 @@ export class Scene extends Container {
     if (this.lastViewport) {
       this.applyResponsiveLayout(this.lastViewport.width, this.lastViewport.height);
     }
+
+    this.scheduleAutoStart();
   }
 
   // --- Initialization Methods ---
@@ -116,6 +119,36 @@ export class Scene extends Container {
     };
   }
 
+  // --- Auto-start flow ---
+
+  private scheduleAutoStart() {
+    if (this.autoStartFrameId !== undefined) {
+      cancelAnimationFrame(this.autoStartFrameId);
+      this.autoStartFrameId = undefined;
+    }
+    const delay = this.config.water.autoStartDelayMs ?? 3000;
+    const start = performance.now();
+
+    const tick = () => {
+      const now = performance.now();
+      const elapsed = now - start;
+      const remaining = Math.max(0, delay - elapsed);
+      this.hudView?.updateFlowCountdown(remaining);
+
+      if (remaining <= 0) {
+        this.autoStartFrameId = undefined;
+        this.gameController?.startWaterFlow().catch(err => {
+          console.error('Failed to start water flow:', err);
+        });
+        return;
+      }
+
+      this.autoStartFrameId = requestAnimationFrame(tick);
+    };
+
+    this.autoStartFrameId = requestAnimationFrame(tick);
+  }
+
   // --- Layout Methods ---
 
   onViewportResize(width: number, height: number) {
@@ -123,8 +156,6 @@ export class Scene extends Container {
     this.position.set(width / 2, height / 2);
     this.applyResponsiveLayout(width, height);
   }
-
-  // --- Layout Helpers ---
 
   private calculateTileSize(width: number, height: number) {
     const { cols, rows } = this.config.grid;
@@ -189,14 +220,6 @@ export class Scene extends Container {
     return Math.max(1, Math.min(size, maxVisible));
   }
 
-  // --- TMP Methods ---
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    if (e.key.toLowerCase() === 'f') {
-      void this.gameController?.startWaterFlow();
-    }
-  };
-
   private centerContent(layout: SceneLayout) {
     const gridBounds = this.resolveGridBounds(layout);
     const queueBounds = this.resolveQueueBounds(layout);
@@ -257,5 +280,13 @@ export class Scene extends Container {
       minY: bounds.minY + offset.y,
       maxY: bounds.maxY + offset.y,
     };
+  }
+
+  destroy(options?: boolean | DestroyOptions): void {
+    if (this.autoStartFrameId !== undefined) {
+      cancelAnimationFrame(this.autoStartFrameId);
+      this.autoStartFrameId = undefined;
+    }
+    super.destroy(options as any);
   }
 }

@@ -4,13 +4,13 @@ import { log } from '@core/logger';
 import { buildInitialBoard } from '@core/logic/boardBuilder';
 import type { RNG } from '@core/logic/boardBuilder';
 import { findLongestConnectedPath } from '@core/logic/pathfinding';
-import type { Dir, PipeKind, Rot, TileState } from '@core/types';
+import type { Dir, Rot, TileState } from '@core/types';
 import type { GridPort } from '@core/ports/GridPort';
 import { PipesQueue, type PipeQueueItem } from '@core/logic/pipesQueue';
 import { getPorts } from '@core/logic/pipes';
-import { OPPOSED_DIRS } from '@core/constants';
 import { ScoreController } from './ScoreController';
-import type { FlowCompletionPayload, FlowTerminationReason } from '@core/types';
+import type { FlowCompletionPayload } from '@core/types';
+import { WaterFlowController } from './WaterFlowController';
 
 type AllowedConfigPipe = GameConfig['gameplay']['allowedPipes'][number];
 type PlaceablePipe = Exclude<AllowedConfigPipe, 'start'>;
@@ -21,16 +21,13 @@ export class GameController {
   private readonly pipesQueue: PipesQueue;
   private gridData: TileState[][] = [];
   private startTile?: TileCoordinate;
-  private isFlowing = false;
-  private activeAnimationFrame?: number;
-  private readonly fillDurationMs: number;
   private readonly scoreController: ScoreController;
+  private readonly waterFlowController: WaterFlowController;
   private _onPipesQueueChange?: (q: readonly PipeQueueItem[]) => void;
   set onPipesQueueChange(cb: ((q: readonly PipeQueueItem[]) => void) | undefined) {
     this._onPipesQueueChange = cb;
     if (cb) cb(this.pipesQueue.snapshotPipes());
   }
-  private hasFlowFrom: Map<string, Set<Dir>> = new Map();
 
   constructor(
     private readonly grid: GridPort,
@@ -44,8 +41,15 @@ export class GameController {
 
     this.placeablePipes = this.resolvePlaceablePipes();
     this.pipesQueue = this.createPipesQueue();
-    this.fillDurationMs = this.config.water.fillDurationMs ?? 1000;
     this.scoreController = new ScoreController(this.config.gameplay.scoring);
+    const fillDurationMs = this.config.water.fillDurationMs ?? 1000;
+    this.waterFlowController = new WaterFlowController( // Water flow is delegated to a dedicated controller. We inject getters for `gridData` and `startTile` to it
+      this.grid,
+      () => this.gridData,
+      () => this.startTile,
+      fillDurationMs,
+      this.scoreController
+    );
   }
 
   async init() {
@@ -249,134 +253,7 @@ export class GameController {
   // --- Water Fill Sequence ---
 
   async startWaterFlow() {
-    if (this.isFlowing) {
-      return;
-    }
-    if (!this.startTile) {
-      log.error('No start tile configured');
-      return;
-    }
-
-    this.isFlowing = true;
-    this.hasFlowFrom.clear();
-    this.scoreController.beginFlow();
-
-    let current: TileCoordinate | undefined = { ...this.startTile };
-    let incoming: Dir | undefined = undefined;
-    let terminationReason: FlowTerminationReason = 'manualStop';
-
-    // The traversal walks the network tile by tile, relying on `incoming` and the
-    // historical flow map to prevent oscillations when a pipe has more than one
-    // valid exit (e.g. crosses). This keeps the simulation deterministic without
-    // maintaining a full visited set.
-    while (this.isFlowing && current) {
-      const state = this.gridData[current.row]?.[current.col];
-      if (!state || !state.kind || state.kind === 'empty') {
-        log.info('Water flow stopped: missing pipe');
-        terminationReason = 'missingPipe';
-        break;
-      }
-
-      const tileKey = this.toKey(current);
-      const filledDirs = this.hasFlowFrom.get(tileKey) ?? new Set<Dir>();
-
-      const exit = this.determineExitDirection(state.kind, state.rot ?? 0, incoming, filledDirs);
-      if (!exit) {
-        log.info('Water flow stopped: no valid exit');
-        if (state.kind !== 'start') {
-          this.scoreController.registerFlowStep({ tile: current, kind: state.kind });
-        }
-        terminationReason = 'noExit';
-        break;
-      }
-
-      await this.animateTileFill(current.col, current.row, incoming, exit);
-
-      if (!this.isFlowing) {
-        terminationReason = 'manualStop';
-        break;
-      }
-
-      if (state.kind !== 'start') {
-        this.scoreController.registerFlowStep({ tile: current, kind: state.kind });
-      }
-
-      filledDirs.add(exit);
-      this.hasFlowFrom.set(tileKey, filledDirs);
-
-      const next = this.getNextCoordinates(current, exit);
-      if (!next) {
-        log.info('Water flow stopped: reached grid boundary');
-        terminationReason = 'outOfBounds';
-        break;
-      }
-
-      const nextState = this.gridData[next.row]?.[next.col];
-      const incomingDir = this.getOpposite(exit);
-      if (!this.canEnterTile(nextState, incomingDir)) {
-        log.info('Water flow stopped: pipeline not connected');
-        terminationReason = 'disconnected';
-        break;
-      }
-
-      current = next;
-      incoming = incomingDir;
-    }
-
-    if (this.activeAnimationFrame !== undefined) {
-      cancelAnimationFrame(this.activeAnimationFrame);
-      this.activeAnimationFrame = undefined;
-    }
-
-    this.isFlowing = false;
-    this.scoreController.completeFlow(terminationReason);
-  }
-
-  private determineExitDirection(
-    kind: PipeKind,
-    rot: Rot,
-    incoming: Dir | undefined,
-    filledDirs: Set<Dir>
-  ): Dir | undefined {
-    const ports = getPorts(kind, rot);
-
-    if (kind === 'start') {
-      return ports[0];
-    }
-
-    if (incoming === undefined) {
-      return undefined;
-    }
-
-    if (!ports.includes(incoming)) {
-      return undefined;
-    }
-
-    // Cross pipes can split water in multiple directions; we prioritize the
-    // straight-through direction to preserve momentum, only falling back to the
-    // secondary arms when the primary path was already consumed earlier.
-    if (kind === 'cross') {
-      const primary = OPPOSED_DIRS[incoming];
-      if (!filledDirs.has(primary)) {
-        return primary;
-      }
-      const alternate = ports.find(
-        dir => dir !== incoming && dir !== primary && !filledDirs.has(dir)
-      );
-      return alternate ?? primary;
-    }
-
-    const candidate = ports.find(dir => dir !== incoming && !filledDirs.has(dir));
-    return candidate ?? ports.find(dir => dir !== incoming) ?? incoming;
-  }
-
-  private canEnterTile(state: TileState | undefined, incoming: Dir): boolean {
-    if (!state || state.blocked || !state.kind || state.kind === 'empty') {
-      return false;
-    }
-
-    const ports = getPorts(state.kind, state.rot ?? 0);
-    return ports.includes(incoming);
+    await this.waterFlowController.startWaterFlow();
   }
 
   private getNextCoordinates(current: TileCoordinate, exit: Dir): TileCoordinate | undefined {
@@ -392,56 +269,6 @@ export class GameController {
       default:
         return undefined;
     }
-  }
-
-  private getOpposite(dir: Dir): Dir {
-    return OPPOSED_DIRS[dir];
-  }
-
-  private async animateTileFill(col: number, row: number, entry: Dir | undefined, exit: Dir) {
-    this.grid.setWaterFlow(col, row, entry);
-    this.grid.setWaterFillProgress(col, row, 0);
-
-    // Using requestAnimationFrame keeps the fill animation in sync with the
-    // renderer while the Promise interface lets the caller await the visual
-    // completion before advancing the fluid simulation to the next tile.
-    return new Promise<void>(resolve => {
-      let startTime: number | undefined;
-
-      const step = (time: number) => {
-        if (!this.isFlowing) {
-          this.grid.setWaterFillProgress(col, row, 1);
-          this.grid.finalizeWaterSegment(col, row, entry, exit);
-          this.activeAnimationFrame = undefined;
-          resolve();
-          return;
-        }
-
-        if (startTime === undefined) {
-          startTime = time;
-        }
-
-        const elapsed = time - startTime;
-        const progress = Math.min(1, elapsed / this.fillDurationMs);
-        this.grid.setWaterFlow(col, row, entry);
-        this.grid.setWaterFillProgress(col, row, progress);
-
-        if (progress >= 1) {
-          this.grid.finalizeWaterSegment(col, row, entry, exit);
-          this.activeAnimationFrame = undefined;
-          resolve();
-          return;
-        }
-
-        this.activeAnimationFrame = requestAnimationFrame(step);
-      };
-
-      this.activeAnimationFrame = requestAnimationFrame(step);
-    });
-  }
-
-  private toKey(coord: TileCoordinate): string {
-    return `${coord.col}:${coord.row}`;
   }
 
   // --- Pipes Queue Methods ---

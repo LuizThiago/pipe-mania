@@ -17,6 +17,8 @@ export class HudView extends Container {
   private targetValue: Text;
   private scoreLabel: Text;
   private scoreValue: Text;
+  private flowLabel: Text;
+  private flowValue: Text;
   private nextLabel: Text;
 
   private currentLayout?: SceneLayout;
@@ -25,6 +27,7 @@ export class HudView extends Container {
   private safeMargin: number;
   private currentFlowProgress = 0;
   private currentTopReserve = 120;
+  private currentCountdownMs: number = 0;
 
   constructor(private readonly config: GameConfig) {
     super();
@@ -48,19 +51,37 @@ export class HudView extends Container {
     this.minTopReserve = hud.minTopReserve;
     this.safeMargin = this.baseSafeMargin;
 
-    this.targetLabel = this.createText('target', this.baseLabelFontSize);
+    this.targetLabel = this.createText(
+      this.config.strings?.targetLabel ?? 'target',
+      this.baseLabelFontSize
+    );
     this.targetLabel.anchor.set(0, 0);
 
     this.targetValue = this.createText(this.formatTargetProgress(0), this.baseValueFontSize);
     this.targetValue.anchor.set(0, 1);
 
-    this.scoreLabel = this.createText('score', this.baseLabelFontSize);
+    this.scoreLabel = this.createText(
+      this.config.strings?.scoreLabel ?? 'score',
+      this.baseLabelFontSize
+    );
     this.scoreLabel.anchor.set(1, 0);
 
     this.scoreValue = this.createText('0', this.baseValueFontSize);
     this.scoreValue.anchor.set(1, 1);
 
-    this.nextLabel = this.createText('next', this.baseLabelFontSize);
+    this.flowLabel = this.createText(
+      this.config.strings?.flowCountdownLabel ?? 'flow in',
+      this.baseLabelFontSize
+    );
+    this.flowLabel.anchor.set(0.5, 0);
+
+    this.flowValue = this.createText('0.0s', this.baseValueFontSize);
+    this.flowValue.anchor.set(0.5, 1);
+
+    this.nextLabel = this.createText(
+      this.config.strings?.nextLabel ?? 'next',
+      this.baseLabelFontSize
+    );
     this.nextLabel.anchor.set(0.5, 0.5);
     this.nextLabel.rotation = -Math.PI / 2;
 
@@ -69,6 +90,8 @@ export class HudView extends Container {
       this.targetValue,
       this.scoreLabel,
       this.scoreValue,
+      this.flowLabel,
+      this.flowValue,
       this.nextLabel
     );
   }
@@ -91,12 +114,27 @@ export class HudView extends Container {
     this.refreshLayout();
   }
 
+  updateFlowCountdown(msRemaining: number) {
+    if (msRemaining < 0) {
+      msRemaining = 0;
+    }
+    if (this.currentCountdownMs === msRemaining) {
+      return;
+    }
+    this.currentCountdownMs = msRemaining;
+    const seconds = Math.ceil(msRemaining / 100) / 10; // 1 decimal, ceiling-ish to avoid jumping to 0 too early
+    this.flowValue.text = `${seconds.toFixed(1)}s`;
+    this.refreshLayout();
+  }
+
   getContentBounds(): { minX: number; maxX: number; minY: number; maxY: number } | undefined {
     const texts = [
       this.targetLabel,
       this.targetValue,
       this.scoreLabel,
       this.scoreValue,
+      this.flowLabel,
+      this.flowValue,
       this.nextLabel,
     ];
     if (texts.length === 0) {
@@ -161,6 +199,19 @@ export class HudView extends Container {
     this.targetLabel.position.set(targetX, targetStack.labelTop);
     maxStackHeight = Math.max(maxStackHeight, targetStack.stackHeight);
 
+    const centerX = this.clampHorizontal(gridPosition.x, 0.5);
+    const flowStack = this.positionValueStack(
+      this.flowValue,
+      this.flowLabel,
+      gridTop - verticalOffset,
+      stackGap,
+      minY,
+      maxY
+    );
+    this.flowValue.position.set(centerX, flowStack.valueBottom);
+    this.flowLabel.position.set(centerX, flowStack.labelTop);
+    maxStackHeight = Math.max(maxStackHeight, flowStack.stackHeight);
+
     const scoreX = this.clampHorizontal(gridRight, 1);
     const scoreStack = this.positionValueStack(
       this.scoreValue,
@@ -212,12 +263,16 @@ export class HudView extends Container {
     this.targetValue.style.fontSize = valueSize;
     this.scoreLabel.style.fontSize = labelSize;
     this.scoreValue.style.fontSize = valueSize;
+    this.flowLabel.style.fontSize = labelSize;
+    this.flowValue.style.fontSize = valueSize;
     this.nextLabel.style.fontSize = labelSize;
 
     (this.targetLabel as any).updateText?.();
     (this.targetValue as any).updateText?.();
     (this.scoreLabel as any).updateText?.();
     (this.scoreValue as any).updateText?.();
+    (this.flowLabel as any).updateText?.();
+    (this.flowValue as any).updateText?.();
     (this.nextLabel as any).updateText?.();
 
     this.safeMargin = Math.max(this.baseSafeMargin, tileSize * 0.35);

@@ -25,6 +25,12 @@ export const ConfigSchema = z.object({
       allowNegativeScore: z.boolean().default(false),
     }),
   }),
+  strings: z.object({
+    targetLabel: z.string().default('target'),
+    scoreLabel: z.string().default('score'),
+    flowCountdownLabel: z.string().default('flow in'),
+    nextLabel: z.string().default('next'),
+  }),
   water: z.object({
     fillProgress: z.number().min(0).max(1).default(0),
     fillColor: z.string().default('#3399ff'),
@@ -32,6 +38,7 @@ export const ConfigSchema = z.object({
     edgeInsetRatio: z.number().min(0).max(0.2).default(0.0025),
     channelWidthRatio: z.number().min(0.05).max(1).default(0.35),
     fillDurationMs: z.number().int().min(16).max(10000).default(1000),
+    autoStartDelayMs: z.number().int().min(0).max(60000).default(15000),
   }),
   queue: z
     .object({
@@ -78,6 +85,12 @@ export const DefaultConfig: GameConfig = {
       allowNegativeScore: false,
     },
   },
+  strings: {
+    targetLabel: 'target',
+    scoreLabel: 'score',
+    flowCountdownLabel: 'flow in',
+    nextLabel: 'next',
+  },
   water: {
     fillProgress: 0,
     fillColor: '#3399ff',
@@ -85,6 +98,7 @@ export const DefaultConfig: GameConfig = {
     edgeInsetRatio: 0.0025,
     channelWidthRatio: 0.35,
     fillDurationMs: 1000,
+    autoStartDelayMs: 15000,
   },
   queue: {
     queueSize: 6,

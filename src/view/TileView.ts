@@ -1,6 +1,6 @@
 import { Assets, Container, Graphics, Sprite } from 'pixi.js';
 import { ASSETS, Z_ORDERS } from '@core/constants';
-import type { PipeKind, Rot } from '@core/types';
+import type { Dir, PipeKind, Rot } from '@core/types';
 import { log } from '@core/logger';
 import type { GameConfig } from '@core/config';
 import { TileWaterRenderer } from './water/TileWaterRenderer';
@@ -12,7 +12,8 @@ export class TileView extends Container {
   private currentRot: Rot = 0;
   private blocked: boolean = false;
   private highlight?: Graphics;
-  private water?: Graphics;
+  private waterDynamic?: Graphics;
+  private waterStatic?: Graphics;
   private waterRenderer?: TileWaterRenderer;
   private fillProgress: number = 0;
 
@@ -53,12 +54,21 @@ export class TileView extends Container {
     this.bg.zIndex = Z_ORDERS.tiles_bg;
     this.addChild(this.bg);
 
-    // water layer
-    this.water = new Graphics();
-    this.water.zIndex = Z_ORDERS.water;
-    this.water.visible = false;
-    this.addChild(this.water);
-    this.waterRenderer = new TileWaterRenderer(this.water, this.config.water);
+    // water layers
+    this.waterStatic = new Graphics();
+    this.waterStatic.zIndex = Z_ORDERS.water;
+    this.waterStatic.visible = false;
+    this.addChild(this.waterStatic);
+
+    this.waterDynamic = new Graphics();
+    this.waterDynamic.zIndex = Z_ORDERS.water + 1;
+    this.waterDynamic.visible = false;
+    this.addChild(this.waterDynamic);
+    this.waterRenderer = new TileWaterRenderer(
+      this.waterDynamic,
+      this.waterStatic,
+      this.config.water
+    );
     this.waterRenderer.setTileSize(this.tileSize);
     this.syncChildOrder();
   }
@@ -166,8 +176,8 @@ export class TileView extends Container {
     }
   }
 
-  setWaterFillProgress(p: number) {
-    const clamped = Math.max(0, Math.min(1, p));
+  setWaterFillProgress(progress: number) {
+    const clamped = Math.max(0, Math.min(1, progress));
 
     if (!this.pipe || !this.currentKind || this.currentKind === 'empty') {
       if (this.fillProgress !== 0) {
@@ -197,6 +207,17 @@ export class TileView extends Container {
     this.setWaterFillProgress(0);
   }
 
+  setWaterFlow(entry?: Dir) {
+    this.waterRenderer?.setEntryDirections(entry);
+    if (this.fillProgress > 0) {
+      this.waterRenderer?.setFillProgress(this.fillProgress);
+    }
+  }
+
+  finalizeWaterSegment(entry: Dir | undefined, exit: Dir) {
+    this.waterRenderer?.commitPath(entry, exit);
+  }
+
   // --- Helper Methods ---
 
   private applyRotation(rot: Rot): void {
@@ -215,8 +236,11 @@ export class TileView extends Container {
     if (this.pipe) {
       this.pipe.zIndex = Z_ORDERS.pipes;
     }
-    if (this.water) {
-      this.water.zIndex = Z_ORDERS.water;
+    if (this.waterStatic) {
+      this.waterStatic.zIndex = Z_ORDERS.water;
+    }
+    if (this.waterDynamic) {
+      this.waterDynamic.zIndex = Z_ORDERS.water + 1;
     }
     this.sortChildren();
   }

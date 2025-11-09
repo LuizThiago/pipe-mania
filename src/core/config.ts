@@ -25,6 +25,7 @@ export const ConfigSchema = z.object({
     fillAlpha: z.number().min(0).max(1).default(1),
     edgeInsetRatio: z.number().min(0).max(0.2).default(0.0025),
     channelWidthRatio: z.number().min(0.05).max(1).default(0.35),
+    fillDurationMs: z.number().int().min(16).max(10000).default(1000),
   }),
   queue: z
     .object({
@@ -62,6 +63,7 @@ export const DefaultConfig: GameConfig = {
     fillAlpha: 1,
     edgeInsetRatio: 0.0025,
     channelWidthRatio: 0.35,
+    fillDurationMs: 1000,
   },
   queue: {
     queueSize: 6,

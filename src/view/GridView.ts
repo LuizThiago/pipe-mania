@@ -2,6 +2,7 @@ import { Container, Graphics } from 'pixi.js';
 import type { GridPort } from '@core/ports/GridPort';
 import { TileView } from './TileView';
 import type { GameConfig } from '@core/config';
+import type { Dir, PipeKind, Rot } from '@core/types';
 
 export class GridView extends Container implements GridPort {
   private tiles: TileView[][] = [];
@@ -171,6 +172,33 @@ export class GridView extends Container implements GridPort {
   }
 
   setFillAll(p: number) {
-    this.forEachTile(t => t.setWaterFillProgress(p));
+    this.setAllWaterFill(p);
+  }
+
+  async setPipe(col: number, row: number, kind: PipeKind, rot: Rot) {
+    const tile = this.tiles[row]?.[col];
+    if (!tile) {
+      return;
+    }
+    await tile.setPipe(kind, rot);
+  }
+
+  setWaterFillProgress(col: number, row: number, progress: number) {
+    const tile = this.tiles[row]?.[col];
+    tile?.setWaterFillProgress(progress);
+  }
+
+  setWaterFlow(col: number, row: number, entry?: Dir) {
+    const tile = this.tiles[row]?.[col];
+    tile?.setWaterFlow(entry);
+  }
+
+  finalizeWaterSegment(col: number, row: number, entry: Dir | undefined, exit: Dir) {
+    const tile = this.tiles[row]?.[col];
+    tile?.finalizeWaterSegment(entry, exit);
+  }
+
+  setAllWaterFill(progress: number) {
+    this.forEachTile(t => t.setWaterFillProgress(progress));
   }
 }

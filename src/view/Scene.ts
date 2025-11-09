@@ -3,8 +3,9 @@ import { loadConfig } from '@core/config';
 import { GameController } from '@core/controller/GameController';
 import { GridView } from './GridView';
 import { QueueView } from './QueueView';
-import { calculateSceneLayout } from './layout/sceneLayout';
+import { calculateSceneLayout, type SceneLayout } from './layout/sceneLayout';
 import { parseColor } from './utils/color';
+import { HudView } from './HudView';
 
 export class Scene extends Container {
   private config = loadConfig();
@@ -12,9 +13,15 @@ export class Scene extends Container {
   private queueView?: QueueView;
   private gameController?: GameController;
   private lastViewport?: { width: number; height: number };
+  private hudView?: HudView;
+  private hudTopReserve: number;
+  private readonly contentRoot: Container;
 
   constructor() {
     super();
+    this.contentRoot = new Container();
+    this.addChild(this.contentRoot);
+    this.hudTopReserve = this.config.hud?.minTopReserve ?? 160;
     window.addEventListener('keydown', this.onKeyDown);
     this.init();
   }
@@ -29,6 +36,7 @@ export class Scene extends Container {
     this.gameController = new GameController(this.gridView, this.config);
     await this.gameController.init();
     await this.createQueue(this.gameController);
+    this.createHud(this.gameController);
 
     if (this.lastViewport) {
       this.applyResponsiveLayout(this.lastViewport.width, this.lastViewport.height);
@@ -63,7 +71,7 @@ export class Scene extends Container {
       this.config
     );
     await gridView.init();
-    this.addChild(gridView);
+    this.contentRoot.addChild(gridView);
     return gridView;
   }
 
@@ -88,10 +96,23 @@ export class Scene extends Container {
     );
     await this.queueView.init();
 
-    this.addChild(this.queueView);
+    this.contentRoot.addChild(this.queueView);
 
     gameController.onPipesQueueChange = queuePipes => {
       this.queueView?.setQueue(queuePipes);
+    };
+  }
+
+  private createHud(gameController: GameController) {
+    this.hudView = new HudView(this.config);
+    this.contentRoot.addChild(this.hudView);
+
+    gameController.onScoreChange = score => {
+      this.hudView?.updateScore(score);
+    };
+
+    gameController.onFlowProgress = progress => {
+      this.hudView?.updateFlowProgress(progress);
     };
   }
 
@@ -110,14 +131,22 @@ export class Scene extends Container {
     const gap = this.config.grid.tileGap ?? 0;
     const maxWidthRatio = this.config.grid.maxWidthRatio ?? 0.9;
     const maxHeightRatio = this.config.grid.maxHeightRatio ?? 0.9;
-    const usableWidth = Math.max(width * maxWidthRatio - gap * (cols - 1), 1);
-    const usableHeight = Math.max(height * maxHeightRatio - gap * (rows - 1), 1);
+    const horizontalReserve = Math.max(width * 0.08, 160);
+    const verticalReserve = Math.max(height * 0.06, this.hudTopReserve);
+
+    const maxGridWidth = Math.max(
+      Math.min(width * maxWidthRatio, width - horizontalReserve * 2),
+      gap * (cols - 1) + 1
+    );
+    const maxGridHeight = Math.max(height * maxHeightRatio - verticalReserve, 1);
+
+    const usableWidth = Math.max(maxGridWidth - gap * (cols - 1), 1);
+    const usableHeight = Math.max(maxGridHeight - gap * (rows - 1), 1);
 
     const sizeFromWidth = usableWidth / cols;
     const sizeFromHeight = usableHeight / rows;
 
-    const tileSize = Math.max(16, Math.min(sizeFromWidth, sizeFromHeight));
-    return tileSize;
+    return Math.max(16, Math.min(sizeFromWidth, sizeFromHeight));
   }
 
   private applyResponsiveLayout(width: number, height: number) {
@@ -147,6 +176,11 @@ export class Scene extends Container {
     );
     this.gridView.position.set(layout.gridPosition.x, layout.gridPosition.y);
     this.queueView.position.set(layout.queuePosition.x, layout.queuePosition.y);
+    this.hudView?.setLayout(layout, width, height, tileSize);
+    if (this.hudView) {
+      this.hudTopReserve = Math.max(96, this.hudView.getTopReserve());
+    }
+    this.centerContent(layout);
   }
 
   private getVisibleQueueSlots(): number {
@@ -162,4 +196,66 @@ export class Scene extends Container {
       void this.gameController?.startWaterFlow();
     }
   };
+
+  private centerContent(layout: SceneLayout) {
+    const gridBounds = this.resolveGridBounds(layout);
+    const queueBounds = this.resolveQueueBounds(layout);
+    const hudLocalBounds = this.hudView?.getContentBounds();
+    const hudBounds = hudLocalBounds
+      ? this.translateBounds(hudLocalBounds, this.hudView!.position)
+      : undefined;
+
+    let minX = Math.min(gridBounds.minX, queueBounds.minX);
+    let maxX = Math.max(gridBounds.maxX, queueBounds.maxX);
+    let minY = Math.min(gridBounds.minY, queueBounds.minY);
+    let maxY = Math.max(gridBounds.maxY, queueBounds.maxY);
+
+    if (hudBounds) {
+      minX = Math.min(minX, hudBounds.minX);
+      maxX = Math.max(maxX, hudBounds.maxX);
+      minY = Math.min(minY, hudBounds.minY);
+      maxY = Math.max(maxY, hudBounds.maxY);
+    }
+
+    const centerX = (minX + maxX) / 2;
+    const centerY = (minY + maxY) / 2;
+
+    this.contentRoot.position.set(-centerX, -centerY);
+  }
+
+  private resolveGridBounds(layout: SceneLayout) {
+    const { gridRect, gridPosition } = layout;
+    const halfWidth = gridRect.outerWidth / 2;
+    const halfHeight = gridRect.outerHeight / 2;
+    return {
+      minX: gridPosition.x - halfWidth,
+      maxX: gridPosition.x + halfWidth,
+      minY: gridPosition.y - halfHeight,
+      maxY: gridPosition.y + halfHeight,
+    };
+  }
+
+  private resolveQueueBounds(layout: SceneLayout) {
+    const { queueRect, queuePosition } = layout;
+    const halfWidth = queueRect.outerWidth / 2;
+    const halfHeight = queueRect.outerHeight / 2;
+    return {
+      minX: queuePosition.x - halfWidth,
+      maxX: queuePosition.x + halfWidth,
+      minY: queuePosition.y - halfHeight,
+      maxY: queuePosition.y + halfHeight,
+    };
+  }
+
+  private translateBounds(
+    bounds: { minX: number; maxX: number; minY: number; maxY: number },
+    offset: { x: number; y: number }
+  ) {
+    return {
+      minX: bounds.minX + offset.x,
+      maxX: bounds.maxX + offset.x,
+      minY: bounds.minY + offset.y,
+      maxY: bounds.maxY + offset.y,
+    };
+  }
 }

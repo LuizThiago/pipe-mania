@@ -13,6 +13,7 @@ type FlowStepContext = {
 
 type ScoreListener = (score: number) => void;
 type FlowCompletionListener = (payload: FlowCompletionPayload) => void;
+type FlowProgressListener = (progress: number) => void;
 
 type TileCoordinate = {
   col: number;
@@ -30,6 +31,7 @@ export class ScoreController {
   private flowActive: boolean = false;
   private scoreListener?: ScoreListener;
   private flowListener?: FlowCompletionListener;
+  private flowProgressListener?: FlowProgressListener;
 
   constructor(config: GameConfig['gameplay']['scoring']) {
     this.flowTileReward = config.flowTileReward;
@@ -49,6 +51,13 @@ export class ScoreController {
     this.flowListener = listener;
   }
 
+  set onFlowProgress(listener: FlowProgressListener | undefined) {
+    this.flowProgressListener = listener;
+    if (listener) {
+      listener(this.currentFlowDistance);
+    }
+  }
+
   getScore(): number {
     return this.score;
   }
@@ -64,6 +73,7 @@ export class ScoreController {
     this.flowActive = true;
     this.currentFlowTiles.clear();
     this.currentFlowDistance = 0;
+    this.emitFlowProgress(this.currentFlowDistance);
   }
 
   registerFlowStep({ tile, kind }: FlowStepContext): void {
@@ -82,6 +92,7 @@ export class ScoreController {
     this.currentFlowTiles.set(key, currentVisits + 1);
     this.currentFlowDistance += 1;
     this.applyScoreDelta(this.flowTileReward, 'Flow tile reward applied');
+    this.emitFlowProgress(this.currentFlowDistance);
   }
 
   completeFlow(reason: FlowTerminationReason): void {
@@ -92,6 +103,7 @@ export class ScoreController {
     this.flowActive = false;
     const totalTraversed = this.currentFlowDistance;
     const goalAchieved = totalTraversed >= this.targetFlowLength;
+    this.emitFlowProgress(totalTraversed);
     this.currentFlowTiles.clear();
     this.currentFlowDistance = 0;
 
@@ -142,6 +154,10 @@ export class ScoreController {
     this.score = next;
     log.info(`${context}. Score updated from ${previous} to ${next}`);
     this.emitScoreUpdate();
+  }
+
+  private emitFlowProgress(progress: number): void {
+    this.flowProgressListener?.(progress);
   }
 
   private toCoordinate({ col, row }: TileCoordinate): string {

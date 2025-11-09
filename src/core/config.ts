@@ -44,6 +44,15 @@ export const ConfigSchema = z.object({
     .refine(data => data.maxVisibleTiles <= data.queueSize, {
       message: 'maxVisibleTiles cannot exceed queueSize',
     }),
+  hud: z.object({
+    labelFontSize: z.number().int().min(4).max(200).default(20),
+    valueFontSize: z.number().int().min(4).max(200).default(30),
+    topOffset: z.number().min(0).max(400).default(60),
+    stackGap: z.number().min(0).max(200).default(12),
+    sideOffset: z.number().min(0).max(400).default(24),
+    safeMargin: z.number().min(0).max(400).default(16),
+    minTopReserve: z.number().min(0).max(400).default(260),
+  }),
 });
 
 export type GameConfig = z.infer<typeof ConfigSchema>;
@@ -56,7 +65,7 @@ export const DefaultConfig: GameConfig = {
     backgroundPadding: 16,
     backgroundCornerRadius: 12,
     maxWidthRatio: 0.75,
-    maxHeightRatio: 0.75,
+    maxHeightRatio: 0.7,
     backgroundColor: '#CBE1DC',
   },
   gameplay: {
@@ -79,10 +88,19 @@ export const DefaultConfig: GameConfig = {
   },
   queue: {
     queueSize: 6,
-    maxVisibleTiles: 6,
+    maxVisibleTiles: 5,
     queueGap: 12,
     queueTopMargin: 16,
     queueBackgroundColor: '#CBE1DC',
+  },
+  hud: {
+    labelFontSize: 20,
+    valueFontSize: 30,
+    topOffset: 10,
+    stackGap: 0,
+    sideOffset: 24,
+    safeMargin: 20,
+    minTopReserve: 90,
   },
 };
 

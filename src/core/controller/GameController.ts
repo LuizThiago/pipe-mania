@@ -445,11 +445,12 @@ export class GameController {
   }
 
   // --- Pipes Queue Methods ---
+
   getQueueSnapshot() {
     return this.pipesQueue.snapshotPipes();
   }
 
-  // --- Score Controller Methods ---
+  // --- Score Controller Events and Getters ---
 
   set onScoreChange(listener: ((score: number) => void) | undefined) {
     this.scoreController.onScoreChange = listener;
@@ -457,6 +458,10 @@ export class GameController {
 
   set onFlowComplete(listener: ((payload: FlowCompletionPayload) => void) | undefined) {
     this.scoreController.onFlowComplete = listener;
+  }
+
+  set onFlowProgress(listener: ((progress: number) => void) | undefined) {
+    this.scoreController.onFlowProgress = listener;
   }
 
   getScore(): number {

@@ -22,6 +22,7 @@ export class Scene extends Container {
   private autoStartFrameId?: number;
   private endModal?: EndModalView;
   private currentLayout?: SceneLayout;
+  private lastOutcomeIsWin?: boolean;
 
   constructor() {
     super();
@@ -42,6 +43,8 @@ export class Scene extends Container {
     await this.gameController.init();
     await this.createQueue(this.gameController);
     this.createHud(this.gameController);
+    this.hudView?.updateStage(this.gameController.getStage());
+    this.hudView?.updateTargetLength(this.gameController.getTargetFlowLength());
     this.subscribeToFlowComplete(this.gameController);
 
     if (this.lastViewport) {
@@ -132,6 +135,7 @@ export class Scene extends Container {
   }
 
   private showEndModal(isWin: boolean) {
+    this.lastOutcomeIsWin = isWin;
     if (!this.endModal) {
       this.endModal = new EndModalView({
         backgroundColor: this.config.endModal?.backgroundColor ?? '#FAFAFA',
@@ -148,7 +152,6 @@ export class Scene extends Container {
       });
       this.contentRoot.addChild(this.endModal);
     } else {
-      // Ensure strings reflect current config even across hot reloads
       this.endModal.setStrings({
         titleWin: this.config.strings?.endModalWinTitle ?? 'stage completed',
         titleLose: this.config.strings?.endModalLoseTitle ?? 'game over',
@@ -173,6 +176,16 @@ export class Scene extends Container {
       this.endModal.visible = false;
     }
     try {
+      if (this.lastOutcomeIsWin) {
+        this.gameController?.advanceStage();
+      } else {
+        this.gameController?.setStage(1);
+        this.gameController?.resetScore();
+      }
+      if (this.gameController) {
+        this.hudView?.updateStage(this.gameController.getStage());
+        this.hudView?.updateTargetLength(this.gameController.getTargetFlowLength());
+      }
       await this.gameController?.resetStage();
       this.hudView?.updateFlowProgress(0);
       this.hudView?.updateFlowCountdown(0);
@@ -180,7 +193,6 @@ export class Scene extends Container {
       this.scheduleAutoStart();
     } catch (err) {
       console.error('Failed to reset stage:', err);
-      // Re-enable input and show modal again so user can retry
       this.gameController?.setInputEnabled(true);
       if (this.endModal) {
         this.endModal.visible = true;
@@ -194,7 +206,8 @@ export class Scene extends Container {
       cancelAnimationFrame(this.autoStartFrameId);
       this.autoStartFrameId = undefined;
     }
-    const delay = this.config.water.autoStartDelayMs ?? 3000;
+    const delay =
+      this.gameController?.getAutoStartDelayMs() ?? this.config.water.autoStartDelayMs ?? 3000;
     const start = performance.now();
 
     const tick = () => {

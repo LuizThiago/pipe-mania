@@ -20,6 +20,9 @@ export class HudView extends Container {
   private flowLabel: Text;
   private flowValue: Text;
   private nextLabel: Text;
+  private stageLabel: Text;
+  private stageValue: Text;
+  private brandingLabel: Text;
 
   private currentLayout?: SceneLayout;
   private viewportSize?: { width: number; height: number };
@@ -28,6 +31,7 @@ export class HudView extends Container {
   private currentFlowProgress = 0;
   private currentTopReserve = 120;
   private currentCountdownMs: number = 0;
+  private currentTargetLength: number;
 
   constructor(private readonly config: GameConfig) {
     super();
@@ -57,6 +61,7 @@ export class HudView extends Container {
     );
     this.targetLabel.anchor.set(0, 0);
 
+    this.currentTargetLength = 1;
     this.targetValue = this.createText(this.formatTargetProgress(0), this.baseValueFontSize);
     this.targetValue.anchor.set(0, 1);
 
@@ -85,6 +90,21 @@ export class HudView extends Container {
     this.nextLabel.anchor.set(0.5, 0.5);
     this.nextLabel.rotation = -Math.PI / 2;
 
+    this.brandingLabel = this.createText(
+      this.config.strings?.branding ?? 'pipe-mania by Luiz Thiago',
+      this.baseLabelFontSize
+    );
+    this.brandingLabel.anchor.set(0.5, 0.5);
+    this.brandingLabel.rotation = -Math.PI / 2;
+
+    this.stageLabel = this.createText(
+      this.config.strings?.stageLabel ?? 'stage',
+      this.baseLabelFontSize
+    );
+    this.stageLabel.anchor.set(0, 0);
+    this.stageValue = this.createText('1', this.baseValueFontSize);
+    this.stageValue.anchor.set(0, 1);
+
     this.addChild(
       this.targetLabel,
       this.targetValue,
@@ -92,8 +112,20 @@ export class HudView extends Container {
       this.scoreValue,
       this.flowLabel,
       this.flowValue,
-      this.nextLabel
+      this.nextLabel,
+      this.brandingLabel,
+      this.stageLabel,
+      this.stageValue
     );
+  }
+
+  updateStage(stage: number) {
+    const text = `${stage}`;
+    if (this.stageValue.text === text) {
+      return;
+    }
+    this.stageValue.text = text;
+    this.refreshLayout();
   }
 
   updateScore(score: number) {
@@ -111,6 +143,17 @@ export class HudView extends Container {
 
     this.currentFlowProgress = progress;
     this.targetValue.text = this.formatTargetProgress(progress);
+    this.refreshLayout();
+  }
+
+  updateTargetLength(target: number) {
+    const next = Math.max(1, Math.floor(target));
+    if (this.currentTargetLength === next) {
+      return;
+    }
+    this.currentTargetLength = next;
+    // Re-render target value using same progress
+    this.targetValue.text = this.formatTargetProgress(this.currentFlowProgress);
     this.refreshLayout();
   }
 
@@ -136,6 +179,8 @@ export class HudView extends Container {
       this.flowLabel,
       this.flowValue,
       this.nextLabel,
+      this.stageLabel,
+      this.stageValue,
     ];
     if (texts.length === 0) {
       return undefined;
@@ -173,64 +218,16 @@ export class HudView extends Container {
       return;
     }
 
-    const { gridRect, gridPosition, queueRect, queuePosition } = this.currentLayout;
-    const gridLeft = gridPosition.x - gridRect.contentWidth / 2 - gridRect.padding;
-    const gridRight = gridPosition.x + gridRect.contentWidth / 2 + gridRect.padding;
-    const gridTop = gridPosition.y - gridRect.outerHeight / 2;
-
-    const verticalOffset = this.baseVerticalOffset * this.labelScale;
-    const stackGap = this.baseStackGap * this.labelScale;
-    const sideOffset = this.baseSideOffset * this.labelScale;
-    const { maxY } = this.getVerticalBounds();
-    const minY = Number.NEGATIVE_INFINITY;
+    const metrics = this.getLayoutMetrics();
 
     let maxStackHeight = 0;
+    maxStackHeight = Math.max(maxStackHeight, this.layoutLeftArea(metrics));
+    maxStackHeight = Math.max(maxStackHeight, this.layoutCenterFlow(metrics));
+    maxStackHeight = Math.max(maxStackHeight, this.layoutRightScore(metrics));
+    this.layoutQueueNext(metrics);
+    this.layoutGridBranding(metrics);
 
-    const targetX = this.clampHorizontal(gridLeft, 0);
-    const targetStack = this.positionValueStack(
-      this.targetValue,
-      this.targetLabel,
-      gridTop - verticalOffset,
-      stackGap,
-      minY,
-      maxY
-    );
-    this.targetValue.position.set(targetX, targetStack.valueBottom);
-    this.targetLabel.position.set(targetX, targetStack.labelTop);
-    maxStackHeight = Math.max(maxStackHeight, targetStack.stackHeight);
-
-    const centerX = this.clampHorizontal(gridPosition.x, 0.5);
-    const flowStack = this.positionValueStack(
-      this.flowValue,
-      this.flowLabel,
-      gridTop - verticalOffset,
-      stackGap,
-      minY,
-      maxY
-    );
-    this.flowValue.position.set(centerX, flowStack.valueBottom);
-    this.flowLabel.position.set(centerX, flowStack.labelTop);
-    maxStackHeight = Math.max(maxStackHeight, flowStack.stackHeight);
-
-    const scoreX = this.clampHorizontal(gridRight, 1);
-    const scoreStack = this.positionValueStack(
-      this.scoreValue,
-      this.scoreLabel,
-      gridTop - verticalOffset,
-      stackGap,
-      minY,
-      maxY
-    );
-    this.scoreValue.position.set(scoreX, scoreStack.valueBottom);
-    this.scoreLabel.position.set(scoreX, scoreStack.labelTop);
-    maxStackHeight = Math.max(maxStackHeight, scoreStack.stackHeight);
-
-    const queueLeft = queuePosition.x - queueRect.contentWidth / 2 - queueRect.padding;
-    const nextX = this.clampHorizontal(queueLeft - sideOffset, 0.5);
-    const nextY = this.clampBottom(queuePosition.y, this.nextLabel.height, minY, maxY);
-    this.nextLabel.position.set(nextX, nextY);
-
-    this.currentTopReserve = verticalOffset + maxStackHeight;
+    this.currentTopReserve = metrics.verticalOffset + maxStackHeight;
   }
 
   private createText(text: string, fontSize: number): Text {
@@ -246,7 +243,7 @@ export class HudView extends Container {
   }
 
   private formatTargetProgress(current: number): string {
-    return `${current}/${this.config.gameplay.scoring.targetFlowLength}`;
+    return `${current}/${this.currentTargetLength}`;
   }
 
   private updateFontSizes(tileSize: number) {
@@ -266,6 +263,9 @@ export class HudView extends Container {
     this.flowLabel.style.fontSize = labelSize;
     this.flowValue.style.fontSize = valueSize;
     this.nextLabel.style.fontSize = labelSize;
+    this.stageLabel.style.fontSize = labelSize;
+    this.stageValue.style.fontSize = valueSize;
+    this.brandingLabel.style.fontSize = labelSize;
 
     (this.targetLabel as any).updateText?.();
     (this.targetValue as any).updateText?.();
@@ -274,8 +274,165 @@ export class HudView extends Container {
     (this.flowLabel as any).updateText?.();
     (this.flowValue as any).updateText?.();
     (this.nextLabel as any).updateText?.();
+    (this.stageLabel as any).updateText?.();
+    (this.stageValue as any).updateText?.();
+    (this.brandingLabel as any).updateText?.();
 
     this.safeMargin = Math.max(this.baseSafeMargin, tileSize * 0.35);
+  }
+
+  // --- Layout helpers ---
+
+  private getLayoutMetrics(): {
+    gridLeft: number;
+    gridRight: number;
+    gridTop: number;
+    gridCenterY: number;
+    centerX: number;
+    queueLeft: number;
+    queueCenterY: number;
+    verticalOffset: number;
+    stackGap: number;
+    sideOffset: number;
+    minY: number;
+    maxY: number;
+  } {
+    const { gridRect, gridPosition, queueRect, queuePosition } = this.currentLayout!;
+    const gridLeft = gridPosition.x - gridRect.contentWidth / 2 - gridRect.padding;
+    const gridRight = gridPosition.x + gridRect.contentWidth / 2 + gridRect.padding;
+    const gridTop = gridPosition.y - gridRect.outerHeight / 2;
+
+    const verticalOffset = this.baseVerticalOffset * this.labelScale;
+    const stackGap = this.baseStackGap * this.labelScale;
+    const sideOffset = this.baseSideOffset * this.labelScale;
+    const { minY, maxY } = this.getVerticalBounds();
+
+    const centerX = this.clampHorizontal(gridPosition.x, 0.5);
+    const queueLeft = queuePosition.x - queueRect.contentWidth / 2 - queueRect.padding;
+    const queueCenterY = queuePosition.y;
+
+    return {
+      gridLeft,
+      gridRight,
+      gridTop,
+      gridCenterY: gridPosition.y,
+      centerX,
+      queueLeft,
+      queueCenterY,
+      verticalOffset,
+      stackGap,
+      sideOffset,
+      minY,
+      maxY,
+    };
+  }
+
+  private layoutLeftArea(metrics: {
+    gridLeft: number;
+    gridTop: number;
+    verticalOffset: number;
+    stackGap: number;
+    minY: number;
+    maxY: number;
+  }): number {
+    const leftX = this.clampHorizontal(metrics.gridLeft, 0);
+    const desiredTopRowBottom = metrics.gridTop - metrics.verticalOffset;
+
+    const stageStack = this.positionValueStack(
+      this.stageValue,
+      this.stageLabel,
+      desiredTopRowBottom,
+      metrics.stackGap,
+      metrics.minY,
+      metrics.maxY
+    );
+    this.stageValue.position.set(leftX, stageStack.valueBottom);
+    this.stageLabel.position.set(leftX, stageStack.labelTop);
+
+    const stageColumnWidth = Math.max(this.stageLabel.width, this.stageValue.width);
+    const targetLeftX = this.clampHorizontal(leftX + stageColumnWidth + metrics.stackGap * 2, 0);
+    const targetStack = this.positionValueStack(
+      this.targetValue,
+      this.targetLabel,
+      desiredTopRowBottom,
+      metrics.stackGap,
+      metrics.minY,
+      metrics.maxY
+    );
+    this.targetValue.position.set(targetLeftX + 40, targetStack.valueBottom);
+    this.targetLabel.position.set(targetLeftX + 40, targetStack.labelTop);
+
+    return Math.max(stageStack.stackHeight, targetStack.stackHeight);
+  }
+
+  private layoutCenterFlow(metrics: {
+    centerX: number;
+    gridTop: number;
+    verticalOffset: number;
+    stackGap: number;
+    minY: number;
+    maxY: number;
+  }): number {
+    const flowStack = this.positionValueStack(
+      this.flowValue,
+      this.flowLabel,
+      metrics.gridTop - metrics.verticalOffset,
+      metrics.stackGap,
+      metrics.minY,
+      metrics.maxY
+    );
+    this.flowValue.position.set(metrics.centerX, flowStack.valueBottom);
+    this.flowLabel.position.set(metrics.centerX, flowStack.labelTop);
+    return flowStack.stackHeight;
+  }
+
+  private layoutRightScore(metrics: {
+    gridRight: number;
+    gridTop: number;
+    verticalOffset: number;
+    stackGap: number;
+    minY: number;
+    maxY: number;
+  }): number {
+    const scoreX = this.clampHorizontal(metrics.gridRight, 1);
+    const scoreStack = this.positionValueStack(
+      this.scoreValue,
+      this.scoreLabel,
+      metrics.gridTop - metrics.verticalOffset,
+      metrics.stackGap,
+      metrics.minY,
+      metrics.maxY
+    );
+    this.scoreValue.position.set(scoreX, scoreStack.valueBottom);
+    this.scoreLabel.position.set(scoreX, scoreStack.labelTop);
+    return scoreStack.stackHeight;
+  }
+
+  private layoutQueueNext(metrics: {
+    queueLeft: number;
+    queueCenterY: number;
+    sideOffset: number;
+    minY: number;
+    maxY: number;
+  }): void {
+    const nextX = this.clampHorizontal(metrics.queueLeft - metrics.sideOffset, 0.5);
+    const nextY = this.clampBottom(
+      metrics.queueCenterY,
+      this.nextLabel.height,
+      metrics.minY,
+      metrics.maxY
+    );
+    this.nextLabel.position.set(nextX, nextY);
+  }
+
+  private layoutGridBranding(metrics: {
+    gridLeft: number;
+    gridCenterY: number;
+    sideOffset: number;
+  }): void {
+    const x = this.clampHorizontal(metrics.gridLeft - metrics.sideOffset, 0.5);
+    const y = metrics.gridCenterY;
+    this.brandingLabel.position.set(x, y);
   }
 
   private clampHorizontal(x: number, anchor: number): number {

@@ -15,13 +15,34 @@ export const ConfigSchema = z.object({
     backgroundColor: z.string().default('#CBE1DC'),
   }),
   gameplay: z.object({
-    blockedTilesPercentage: z.number().min(0).max(1).default(0.24),
     allowedPipes: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
+    difficulty: z
+      .object({
+        blockedPercentStart: z.number().min(0).max(1).default(0),
+        blockedPercentPerStage: z.number().min(0).max(1).default(0.05),
+        blockedPercentMax: z.number().min(0).max(1).default(0.35),
+        targetLengthStart: z.number().int().min(1).default(5),
+        targetLengthPerStage: z.number().int().min(0).default(1),
+        targetLengthMax: z.number().int().min(1).default(30),
+        flowAutoStart: z
+          .object({
+            multiplierPerStage: z.number().min(0.1).max(2).default(1),
+            minMs: z.number().int().min(0).max(60000).default(0),
+          })
+          .optional(),
+      })
+      .default({
+        blockedPercentStart: 0,
+        blockedPercentPerStage: 0.05,
+        blockedPercentMax: 0.35,
+        targetLengthStart: 5,
+        targetLengthPerStage: 1,
+        targetLengthMax: 30,
+      }),
     scoring: z.object({
       flowTileReward: z.number().int().min(0).default(100),
       replacementPenalty: z.number().int().min(0).default(50),
-      targetFlowLength: z.number().int().min(1).default(12),
       allowNegativeScore: z.boolean().default(false),
     }),
   }),
@@ -30,6 +51,8 @@ export const ConfigSchema = z.object({
     scoreLabel: z.string().default('score'),
     flowCountdownLabel: z.string().default('flow in'),
     nextLabel: z.string().default('next'),
+    stageLabel: z.string().default('stage'),
+    branding: z.string().default('pipe-mania by Luiz Thiago'),
     endModalWinTitle: z.string().default('stage completed'),
     endModalLoseTitle: z.string().default('game over'),
     endModalWinAction: z.string().default('next stage'),
@@ -86,12 +109,22 @@ export const DefaultConfig: GameConfig = {
     backgroundColor: '#CBE1DC',
   },
   gameplay: {
-    blockedTilesPercentage: 0.24,
     allowedPipes: ['straight', 'curve', 'cross'],
+    difficulty: {
+      blockedPercentStart: 0,
+      blockedPercentPerStage: 0.05,
+      blockedPercentMax: 0.35,
+      targetLengthStart: 5,
+      targetLengthPerStage: 1,
+      targetLengthMax: 30,
+      flowAutoStart: {
+        multiplierPerStage: 1,
+        minMs: 0,
+      },
+    },
     scoring: {
       flowTileReward: 100,
       replacementPenalty: 50,
-      targetFlowLength: 12,
       allowNegativeScore: false,
     },
   },
@@ -100,6 +133,8 @@ export const DefaultConfig: GameConfig = {
     scoreLabel: 'score',
     flowCountdownLabel: 'flow in',
     nextLabel: 'next',
+    stageLabel: 'stage',
+    branding: 'pipe-mania by Luiz Thiago',
     endModalWinTitle: 'stage completed',
     endModalLoseTitle: 'game over',
     endModalWinAction: 'next stage',

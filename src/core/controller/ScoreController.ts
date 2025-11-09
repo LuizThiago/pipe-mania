@@ -23,7 +23,7 @@ type TileCoordinate = {
 export class ScoreController {
   private readonly flowTileReward: number;
   private readonly replacementPenalty: number;
-  private readonly targetFlowLength: number;
+  private targetFlowLength: number;
   private readonly allowNegativeScore: boolean;
   private score: number = 0;
   private currentFlowTiles: Map<string, number> = new Map();
@@ -36,7 +36,8 @@ export class ScoreController {
   constructor(config: GameConfig['gameplay']['scoring']) {
     this.flowTileReward = config.flowTileReward;
     this.replacementPenalty = config.replacementPenalty;
-    this.targetFlowLength = config.targetFlowLength;
+    // Target will be set by GameController according to difficulty/stage
+    this.targetFlowLength = 1;
     this.allowNegativeScore = config.allowNegativeScore;
   }
 
@@ -62,6 +63,27 @@ export class ScoreController {
     return this.score;
   }
 
+  resetScore(): void {
+    this.score = 0;
+    this.emitScoreUpdate();
+  }
+
+  getTargetFlowLength(): number {
+    return this.targetFlowLength;
+  }
+
+  setTargetFlowLength(length: number): void {
+    if (!Number.isFinite(length)) {
+      log.warn(`Invalid target flow length: ${length}. Ignoring.`);
+      return;
+    }
+    const next = Math.max(1, Math.floor(length));
+    if (this.targetFlowLength === next) {
+      return;
+    }
+    this.targetFlowLength = next;
+    this.emitFlowProgress(this.currentFlowDistance);
+  }
   handlePipePlacement(context: PipePlacementContext): void {
     if (!context.wasReplacement) {
       return;

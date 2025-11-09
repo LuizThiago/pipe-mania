@@ -108,11 +108,9 @@ export class EndModalView extends Container {
   }
 
   private layoutChildren() {
-    // Title centered near top
     this.title.anchor.set(0.5, 0.5);
     this.title.position.set(this.panelWidth / 2, this.panelHeight * 0.33);
 
-    // Button centered near bottom
     const btnWidth = Math.min(280, this.panelWidth - 80);
     const btnHeight = 56;
     const x = (this.panelWidth - btnWidth) / 2;

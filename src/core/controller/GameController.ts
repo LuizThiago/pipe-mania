@@ -21,6 +21,7 @@ export class GameController {
   private readonly pipesQueue: PipesQueue;
   private gridData: TileState[][] = [];
   private startTile?: TileCoordinate;
+  private stage: number = 1;
   private inputLocked: boolean = false;
   private readonly scoreController: ScoreController;
   private readonly waterFlowController: WaterFlowController;
@@ -43,8 +44,9 @@ export class GameController {
     this.placeablePipes = this.resolvePlaceablePipes();
     this.pipesQueue = this.createPipesQueue();
     this.scoreController = new ScoreController(this.config.gameplay.scoring);
+    this.updateDifficultyForCurrentStage();
     const fillDurationMs = this.config.water.fillDurationMs ?? 1000;
-    this.waterFlowController = new WaterFlowController( // Water flow is delegated to a dedicated controller. We inject getters for `gridData` and `startTile` to it
+    this.waterFlowController = new WaterFlowController(
       this.grid,
       () => this.gridData,
       () => this.startTile,
@@ -77,7 +79,7 @@ export class GameController {
 
   private async buildBoard() {
     const { rows, cols } = this.config.grid;
-    const { blockedTilesPercentage } = this.config.gameplay;
+    const blockedTilesPercentage = this.getBlockedTilesPercentageForStage();
 
     const { gridData, blockedTiles } = buildInitialBoard({
       rows,
@@ -114,9 +116,6 @@ export class GameController {
     let chosen: TileCoordinate | undefined;
     let chosenRot: Rot | undefined;
 
-    // Random sampling keeps the placement unpredictable while naturally rejecting
-    // dead ends. I intentionally mutate the candidates list to avoid revisiting
-    // positions that were already proven invalid for every rotation.
     while (candidates.length > 0 && (!chosen || chosenRot === undefined)) {
       const index = Math.floor(this.rng() * candidates.length);
       const candidate = candidates.splice(index, 1)[0];
@@ -196,6 +195,11 @@ export class GameController {
       return false;
     }
 
+    const state = this.gridData[row]?.[col];
+    if (state?.kind === 'start') {
+      return false;
+    }
+
     return !this.grid.isBlocked(col, row) && !this.grid.hasWaterFlow(col, row);
   }
 
@@ -211,7 +215,12 @@ export class GameController {
     }
 
     const state = this.gridData[row]?.[col];
-    const wasReplacement = !!state?.kind && state.kind !== 'empty' && state.kind !== 'start';
+    if (state?.kind === 'start') {
+      // Safety guard: do not allow overwriting the start tile
+      return false;
+    }
+
+    const wasReplacement = !!state?.kind && state.kind !== 'empty';
 
     try {
       await tile.setPipe(pipe.kind, pipe.rot);
@@ -237,7 +246,6 @@ export class GameController {
 
   private validateConfig(): boolean {
     const { rows, cols } = this.config.grid;
-    const { blockedTilesPercentage } = this.config.gameplay;
 
     if (!Number.isInteger(rows) || rows <= 0) {
       log.error('grid.rows must be a positive integer');
@@ -247,9 +255,23 @@ export class GameController {
       log.error('grid.cols must be a positive integer');
       return false;
     }
-    if (blockedTilesPercentage < 0 || blockedTilesPercentage > 1) {
-      log.error('gameplay.blockedTilesPercentage must be between 0 and 1');
-      return false;
+
+    // Validate flowAutoStart if provided to prevent runaway/invalid values
+    const difficulty = this.config.gameplay?.difficulty;
+    const flowAutoStart = difficulty?.flowAutoStart;
+    if (flowAutoStart) {
+      const mult = flowAutoStart.multiplierPerStage;
+      const minMs = flowAutoStart.minMs;
+      if (!Number.isFinite(mult) || mult <= 0) {
+        log.error(
+          'gameplay.difficulty.flowAutoStart.multiplierPerStage must be a finite number > 0'
+        );
+        return false;
+      }
+      if (!Number.isFinite(minMs) || minMs < 0) {
+        log.error('gameplay.difficulty.flowAutoStart.minMs must be a finite number >= 0');
+        return false;
+      }
     }
 
     return true;
@@ -298,6 +320,80 @@ export class GameController {
 
   getScore(): number {
     return this.scoreController.getScore();
+  }
+
+  // --- Stage/Score Management ---
+  getStage(): number {
+    return this.stage;
+  }
+
+  setStage(next: number): void {
+    this.stage = Math.max(1, Math.floor(next));
+    this.updateDifficultyForCurrentStage();
+  }
+
+  advanceStage(): void {
+    this.stage = this.stage + 1;
+    this.updateDifficultyForCurrentStage();
+  }
+
+  resetScore(): void {
+    this.scoreController.resetScore();
+  }
+
+  private getBlockedTilesPercentageForStage(): number {
+    const diff = this.config.gameplay.difficulty;
+    const start = diff.blockedPercentStart;
+    const per = diff.blockedPercentPerStage;
+    const max = diff.blockedPercentMax;
+    // Stage 1 => start, Stage N => start + (N-1)*per
+    const pct = start + Math.max(0, this.stage - 1) * per;
+    return Math.max(0, Math.min(max, pct));
+  }
+
+  private updateDifficultyForCurrentStage(): void {
+    // Update target flow length based on stage
+    const diff = this.config.gameplay.difficulty;
+    const base = diff.targetLengthStart;
+    const inc = diff.targetLengthPerStage;
+    const cap = diff.targetLengthMax;
+    const computed = Math.min(cap, base + Math.max(0, this.stage - 1) * inc);
+    this.scoreController.setTargetFlowLength(computed);
+  }
+
+  getTargetFlowLength(): number {
+    return this.scoreController.getTargetFlowLength();
+  }
+
+  getAutoStartDelayMs(): number {
+    // Base delay; ensure finite, non-negative
+    const baseRaw = this.config.water.autoStartDelayMs ?? 3000;
+    const base = Number.isFinite(baseRaw) && baseRaw >= 0 ? baseRaw : 3000;
+
+    // Reasonable hard cap to keep value bounded (1 minute)
+    const HARD_CAP_MS = 60000;
+
+    const diff = this.config.gameplay.difficulty;
+    if (!diff || !diff.flowAutoStart) {
+      // Clamp to cap even without difficulty overrides
+      return Math.min(base, HARD_CAP_MS);
+    }
+
+    // Safe defaults and guards
+    const multRaw = diff.flowAutoStart.multiplierPerStage ?? 1;
+    const minMsRaw = diff.flowAutoStart.minMs ?? 0;
+    const mult = Number.isFinite(multRaw) && multRaw > 0 ? multRaw : 1;
+    const minMs = Number.isFinite(minMsRaw) && minMsRaw >= 0 ? minMsRaw : 0;
+
+    const exponent = Math.max(0, this.stage - 1);
+    const scaledRaw = base * Math.pow(mult, exponent);
+    const scaledFinite = Number.isFinite(scaledRaw) && scaledRaw >= 0 ? scaledRaw : base;
+
+    // Clamp to keep bounded and non-negative
+    const minMsClamped = Math.min(Math.max(0, minMs), HARD_CAP_MS);
+    const scaledClamped = Math.min(scaledFinite, HARD_CAP_MS);
+
+    return Math.max(minMsClamped, scaledClamped);
   }
 
   setInputEnabled(enabled: boolean): void {

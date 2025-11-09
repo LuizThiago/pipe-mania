@@ -7,6 +7,8 @@ import { QueueView } from './QueueView';
 import { calculateSceneLayout, type SceneLayout } from './layout/sceneLayout';
 import { parseColor } from './utils/color';
 import { HudView } from './HudView';
+import type { FlowCompletionPayload } from '@core/types';
+import { EndModalView } from './EndModalView';
 
 export class Scene extends Container {
   private config = loadConfig();
@@ -18,6 +20,8 @@ export class Scene extends Container {
   private hudTopReserve: number;
   private readonly contentRoot: Container;
   private autoStartFrameId?: number;
+  private endModal?: EndModalView;
+  private currentLayout?: SceneLayout;
 
   constructor() {
     super();
@@ -38,6 +42,7 @@ export class Scene extends Container {
     await this.gameController.init();
     await this.createQueue(this.gameController);
     this.createHud(this.gameController);
+    this.subscribeToFlowComplete(this.gameController);
 
     if (this.lastViewport) {
       this.applyResponsiveLayout(this.lastViewport.width, this.lastViewport.height);
@@ -119,6 +124,69 @@ export class Scene extends Container {
     };
   }
 
+  private subscribeToFlowComplete(gameController: GameController) {
+    gameController.onFlowComplete = (payload: FlowCompletionPayload) => {
+      this.gameController?.setInputEnabled(false);
+      this.showEndModal(payload.goalAchieved);
+    };
+  }
+
+  private showEndModal(isWin: boolean) {
+    if (!this.endModal) {
+      this.endModal = new EndModalView({
+        backgroundColor: this.config.endModal?.backgroundColor ?? '#FAFAFA',
+        width: this.config.endModal?.width ?? 420,
+        height: this.config.endModal?.height ?? 240,
+        cornerRadius: this.config.endModal?.cornerRadius ?? 16,
+        titleWin: this.config.strings?.endModalWinTitle ?? 'stage completed',
+        titleLose: this.config.strings?.endModalLoseTitle ?? 'game over',
+        actionWin: this.config.strings?.endModalWinAction ?? 'next stage',
+        actionLose: this.config.strings?.endModalLoseAction ?? 'play again',
+        onAction: () => {
+          this.handleEndModalAction();
+        },
+      });
+      this.contentRoot.addChild(this.endModal);
+    } else {
+      // Ensure strings reflect current config even across hot reloads
+      this.endModal.setStrings({
+        titleWin: this.config.strings?.endModalWinTitle ?? 'stage completed',
+        titleLose: this.config.strings?.endModalLoseTitle ?? 'game over',
+        actionWin: this.config.strings?.endModalWinAction ?? 'next stage',
+        actionLose: this.config.strings?.endModalLoseAction ?? 'play again',
+      });
+    }
+    this.endModal.setContent(isWin);
+    if (this.currentLayout) {
+      this.endModal.position.set(
+        this.currentLayout.gridPosition.x,
+        this.currentLayout.gridPosition.y
+      );
+    } else {
+      this.endModal.position.set(0, this.hudTopReserve / 2);
+    }
+    this.endModal.visible = true;
+  }
+
+  private async handleEndModalAction() {
+    if (this.endModal) {
+      this.endModal.visible = false;
+    }
+    try {
+      await this.gameController?.resetStage();
+      this.hudView?.updateFlowProgress(0);
+      this.hudView?.updateFlowCountdown(0);
+      this.gameController?.setInputEnabled(true);
+      this.scheduleAutoStart();
+    } catch (err) {
+      console.error('Failed to reset stage:', err);
+      // Re-enable input and show modal again so user can retry
+      this.gameController?.setInputEnabled(true);
+      if (this.endModal) {
+        this.endModal.visible = true;
+      }
+    }
+  }
   // --- Auto-start flow ---
 
   private scheduleAutoStart() {
@@ -205,6 +273,7 @@ export class Scene extends Container {
       this.config.queue,
       visibleSlots
     );
+    this.currentLayout = layout;
     this.gridView.position.set(layout.gridPosition.x, layout.gridPosition.y);
     this.queueView.position.set(layout.queuePosition.x, layout.queuePosition.y);
     this.hudView?.setLayout(layout, width, height, tileSize);

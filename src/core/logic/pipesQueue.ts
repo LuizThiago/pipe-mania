@@ -27,6 +27,11 @@ export class PipesQueue {
     this.fillPipesQueue();
   }
 
+  reset(): void {
+    this.pipes.length = 0;
+    this.fillPipesQueue();
+  }
+
   peekPipe(): PipeQueueItem {
     return this.pipes[0];
   }

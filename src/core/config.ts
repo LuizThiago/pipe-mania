@@ -30,6 +30,10 @@ export const ConfigSchema = z.object({
     scoreLabel: z.string().default('score'),
     flowCountdownLabel: z.string().default('flow in'),
     nextLabel: z.string().default('next'),
+    endModalWinTitle: z.string().default('stage completed'),
+    endModalLoseTitle: z.string().default('game over'),
+    endModalWinAction: z.string().default('next stage'),
+    endModalLoseAction: z.string().default('play again'),
   }),
   water: z.object({
     fillProgress: z.number().min(0).max(1).default(0),
@@ -59,6 +63,12 @@ export const ConfigSchema = z.object({
     sideOffset: z.number().min(0).max(400).default(24),
     safeMargin: z.number().min(0).max(400).default(16),
     minTopReserve: z.number().min(0).max(400).default(260),
+  }),
+  endModal: z.object({
+    width: z.number().int().min(120).max(1600).default(420),
+    height: z.number().int().min(120).max(1200).default(240),
+    cornerRadius: z.number().int().min(0).max(120).default(16),
+    backgroundColor: z.string().default('#FAFAFA'),
   }),
 });
 
@@ -90,6 +100,10 @@ export const DefaultConfig: GameConfig = {
     scoreLabel: 'score',
     flowCountdownLabel: 'flow in',
     nextLabel: 'next',
+    endModalWinTitle: 'stage completed',
+    endModalLoseTitle: 'game over',
+    endModalWinAction: 'next stage',
+    endModalLoseAction: 'play again',
   },
   water: {
     fillProgress: 0,
@@ -115,6 +129,12 @@ export const DefaultConfig: GameConfig = {
     sideOffset: 24,
     safeMargin: 20,
     minTopReserve: 90,
+  },
+  endModal: {
+    width: 420,
+    height: 240,
+    cornerRadius: 16,
+    backgroundColor: '#FAFAFA',
   },
 };
 

@@ -4,6 +4,7 @@ import type { Dir, PipeKind, Rot } from '@core/types';
 export interface GridPort {
   setAsBlocked(col: number, row: number): void;
   isBlocked(col: number, row: number): boolean;
+  clearAllBlocks(): void;
   setPipe(col: number, row: number, kind: PipeKind, rot: Rot): Promise<void>;
   setWaterFillProgress(col: number, row: number, progress: number): void;
   setWaterFlow(col: number, row: number, entry?: Dir): void;

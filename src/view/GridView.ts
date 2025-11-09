@@ -131,6 +131,16 @@ export class GridView extends Container implements GridPort {
     return !!this.blockedTiles[row]?.[col];
   }
 
+  clearAllBlocks(): void {
+    for (let y = 0; y < this.rows; y++) {
+      for (let x = 0; x < this.cols; x++) {
+        this.blockedTiles[y][x] = false;
+        const tile = this.tiles[y]?.[x];
+        tile?.setIsBlocked(false);
+      }
+    }
+  }
+
   async setPipe(col: number, row: number, kind: PipeKind, rot: Rot) {
     const tile = this.tiles[row]?.[col];
     if (!tile) {

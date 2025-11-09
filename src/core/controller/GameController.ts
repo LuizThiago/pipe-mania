@@ -21,6 +21,7 @@ export class GameController {
   private readonly pipesQueue: PipesQueue;
   private gridData: TileState[][] = [];
   private startTile?: TileCoordinate;
+  private inputLocked: boolean = false;
   private readonly scoreController: ScoreController;
   private readonly waterFlowController: WaterFlowController;
   private _onPipesQueueChange?: (q: readonly PipeQueueItem[]) => void;
@@ -86,6 +87,7 @@ export class GameController {
     });
 
     this.gridData = gridData;
+    this.grid.clearAllBlocks();
     for (const { col, row } of blockedTiles) {
       this.grid.setAsBlocked(col, row);
     }
@@ -186,6 +188,9 @@ export class GameController {
   };
 
   private canPlacePipe(col: number, row: number): boolean {
+    if (this.inputLocked) {
+      return false;
+    }
     if (row < 0 || row >= this.gridData.length || col < 0 || col >= this.gridData[row].length) {
       log.error('Invalid grid position');
       return false;
@@ -293,5 +298,41 @@ export class GameController {
 
   getScore(): number {
     return this.scoreController.getScore();
+  }
+
+  setInputEnabled(enabled: boolean): void {
+    this.inputLocked = !enabled;
+  }
+
+  async resetStage(): Promise<void> {
+    // Clear all tiles (pipes and water)
+    for (let row = 0; row < this.gridData.length; row++) {
+      for (let col = 0; col < (this.gridData[row]?.length ?? 0); col++) {
+        try {
+          await this.grid.setPipe(col, row, 'empty', 0);
+        } catch {
+          // Best-effort; continue clearing others
+        }
+        // Reset in-memory state
+        if (this.gridData[row] && this.gridData[row][col]) {
+          this.gridData[row][col].kind = 'empty';
+          this.gridData[row][col].rot = 0 as Rot;
+          this.gridData[row][col].blocked = false;
+        }
+      }
+    }
+    this.grid.setAllWaterFill(0);
+    this.grid.clearAllBlocks();
+    this.startTile = undefined;
+
+    // Rebuild board and start tile
+    await this.buildBoard();
+
+    // Reset the queue
+    this.pipesQueue.reset();
+    this._onPipesQueueChange?.(this.pipesQueue.snapshotPipes());
+
+    // Re-enable input
+    this.inputLocked = false;
   }
 }

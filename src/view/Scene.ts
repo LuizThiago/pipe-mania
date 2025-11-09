@@ -1,11 +1,11 @@
-import { Assets, Container } from 'pixi.js';
+import { Assets, Container, Ticker } from 'pixi.js';
 import { loadConfig } from '@core/config';
 import { GameController } from '@core/controller/GameController';
 import { GridView } from './GridView';
 import { QueueView } from './QueueView';
-import { log } from '@core/logger';
 import { calculateSceneLayout } from './layout/sceneLayout';
 import { parseColor } from './utils/color';
+import { log } from '@core/logger';
 
 export class Scene extends Container {
   private config = loadConfig();
@@ -13,8 +13,14 @@ export class Scene extends Container {
   private queueView?: QueueView;
   private lastViewport?: { width: number; height: number };
 
-  constructor() {
+  private filling = false;
+  private fillStartTime = 0;
+  private fillDurationMs = 1000;
+
+  constructor(private readonly ticker: Ticker) {
     super();
+    this.ticker.add(this.updateFill);
+    window.addEventListener('keydown', this.onKeyDown);
     this.init();
   }
 
@@ -57,7 +63,8 @@ export class Scene extends Container {
       this.config.grid.tileGap ?? 5,
       this.config.grid.backgroundPadding ?? 16,
       this.config.grid.backgroundCornerRadius ?? 12,
-      parseColor(this.config.grid.backgroundColor ?? '#CBE1DC')
+      parseColor(this.config.grid.backgroundColor ?? '#CBE1DC'),
+      this.config
     );
     await gridView.init();
     this.addChild(gridView);
@@ -123,7 +130,6 @@ export class Scene extends Container {
 
     // Grid
     if (!this.gridView) {
-      log.error('Grid view not found');
       return;
     }
 
@@ -131,7 +137,6 @@ export class Scene extends Container {
 
     // Queue
     if (!this.queueView) {
-      log.error('Queue view not found');
       return;
     }
     const visibleSlots = this.getVisibleQueueSlots();
@@ -153,4 +158,41 @@ export class Scene extends Container {
     const maxVisible = this.config.queue.maxVisibleTiles ?? size;
     return Math.max(1, Math.min(size, maxVisible));
   }
+
+  // --- TMP Methods ---
+
+  private onKeyDown = (e: KeyboardEvent) => {
+    log.info('onKeyDown', e.key);
+    if (e.key.toLowerCase() === 'f') {
+      this.startFillTest();
+    }
+  };
+
+  private startFillTest() {
+    if (!this.gridView) {
+      log.error('GridView not ready');
+      return;
+    }
+    log.info('startFillTest');
+    this.filling = true;
+    this.fillStartTime = performance.now();
+    this.gridView.setFillAll(0);
+  }
+
+  private updateFill = () => {
+    if (!this.filling || !this.gridView) return;
+
+    log.info('updateFill', this.filling, this.gridView);
+
+    const now = performance.now();
+    const t = (now - this.fillStartTime) / this.fillDurationMs;
+    if (t >= 1) {
+      log.info('updateFill done');
+      this.gridView.setFillAll(1);
+      this.filling = false;
+      return;
+    }
+    log.info('updateFill', t);
+    this.gridView.setFillAll(Math.max(0, Math.min(1, t)));
+  };
 }

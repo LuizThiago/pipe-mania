@@ -11,7 +11,7 @@ export async function createPixiApp(mount: HTMLElement) {
   app.canvas.style.position = 'absolute';
   mount.appendChild(app.canvas as HTMLCanvasElement);
 
-  const scene = new Scene();
+  const scene = new Scene(app.ticker);
   app.stage.addChild(scene);
   setupSceneAutoCenter(app, scene);
 

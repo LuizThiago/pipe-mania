@@ -106,9 +106,8 @@ export class QueueView extends Container {
     const pad = this.backgroundPadding;
 
     this.background!.clear()
-      .beginFill(this.backgroundColor)
-      .drawRoundedRect(-pad, -pad, this.outerWidth, this.outerHeight, this.backgroundCornerRadius)
-      .endFill();
+      .roundRect(-pad, -pad, this.outerWidth, this.outerHeight, this.backgroundCornerRadius)
+      .fill({ color: this.backgroundColor });
   }
 
   private centerPivot() {

@@ -1,6 +1,7 @@
 import { Container, Graphics } from 'pixi.js';
 import type { GridPort } from '@core/ports/GridPort';
 import { TileView } from './TileView';
+import type { GameConfig } from '@core/config';
 
 export class GridView extends Container implements GridPort {
   private tiles: TileView[][] = [];
@@ -14,7 +15,8 @@ export class GridView extends Container implements GridPort {
     private gap: number,
     private readonly backgroundPadding: number,
     private readonly backgroundCornerRadius: number,
-    private readonly backgroundColor: number
+    private readonly backgroundColor: number,
+    private readonly config: GameConfig
   ) {
     super();
     this.blockedTiles = Array.from({ length: rows }, () =>
@@ -31,7 +33,7 @@ export class GridView extends Container implements GridPort {
       for (let y = 0; y < this.rows; y++) {
         const row: TileView[] = [];
         for (let x = 0; x < this.cols; x++) {
-          const tile = new TileView(y, x, this.tileSize);
+          const tile = new TileView(y, x, this.tileSize, this.config);
           tile.position.set(x * (this.tileSize + this.gap), y * (this.tileSize + this.gap));
           this.addChild(tile);
           row.push(tile);
@@ -95,18 +97,11 @@ export class GridView extends Container implements GridPort {
 
   private updateBackground() {
     this.ensureBackground();
-    this.background!.clear();
     const padding = this.backgroundPadding;
 
-    this.background!.beginFill(this.backgroundColor)
-      .drawRoundedRect(
-        -padding,
-        -padding,
-        this.outerWidth,
-        this.outerHeight,
-        this.backgroundCornerRadius
-      )
-      .endFill();
+    this.background!.clear()
+      .roundRect(-padding, -padding, this.outerWidth, this.outerHeight, this.backgroundCornerRadius)
+      .fill({ color: this.backgroundColor });
   }
 
   // --- Getters ---
@@ -163,5 +158,19 @@ export class GridView extends Container implements GridPort {
     tile.on('tile:click', payload => {
       this.emit('grid:tileSelected', { ...payload, tile });
     });
+  }
+
+  // --- TMP Methods ---
+
+  forEachTile(cb: (t: TileView) => void) {
+    for (const row of this.tiles) {
+      for (const t of row) {
+        cb(t);
+      }
+    }
+  }
+
+  setFillAll(p: number) {
+    this.forEachTile(t => t.setWaterFillProgress(p));
   }
 }

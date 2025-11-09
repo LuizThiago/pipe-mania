@@ -19,6 +19,13 @@ export const ConfigSchema = z.object({
     allowedPipes: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
   }),
+  water: z.object({
+    fillProgress: z.number().min(0).max(1).default(0),
+    fillColor: z.string().default('#3399ff'),
+    fillAlpha: z.number().min(0).max(1).default(1),
+    edgeInsetRatio: z.number().min(0).max(0.2).default(0.0025),
+    channelWidthRatio: z.number().min(0.05).max(1).default(0.35),
+  }),
   queue: z
     .object({
       queueSize: z.number().int().min(1).max(12).default(6),
@@ -48,6 +55,13 @@ export const DefaultConfig: GameConfig = {
   gameplay: {
     blockedTilesPercentage: 0.24,
     allowedPipes: ['straight', 'curve', 'cross'],
+  },
+  water: {
+    fillProgress: 0,
+    fillColor: '#3399ff',
+    fillAlpha: 1,
+    edgeInsetRatio: 0.0025,
+    channelWidthRatio: 0.35,
   },
   queue: {
     queueSize: 6,

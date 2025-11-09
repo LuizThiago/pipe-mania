@@ -1,9 +1,9 @@
-import { Assets, Container, Graphics, Sprite } from 'pixi.js';
+import { Assets, Container, Graphics, Sprite, Texture } from 'pixi.js';
 import { ASSETS, Z_ORDERS } from '@core/constants';
 import type { Dir, PipeKind, Rot } from '@core/types';
 import { log } from '@core/logger';
 import type { GameConfig } from '@core/config';
-import { TileWaterRenderer } from './water/TileWaterRenderer';
+import { TileWaterRenderer } from './TileWaterRenderer';
 
 export class TileView extends Container {
   private bg!: Sprite;
@@ -102,8 +102,8 @@ export class TileView extends Container {
       return;
     }
 
-    const tex = await Assets.load(ASSETS[kind]);
-    if (tex === undefined) {
+    const tex = await Assets.load<Texture>(ASSETS[kind]);
+    if (!tex || tex === undefined) {
       log.error('Asset not found for pipe kind:', kind);
       return;
     }
@@ -111,23 +111,38 @@ export class TileView extends Container {
     this.currentKind = kind;
 
     if (!this.pipe) {
-      this.pipe = new Sprite(tex);
-      this.setupSpriteSizes(this.pipe);
-      this.pipe.zIndex = Z_ORDERS.pipes;
-      this.addChild(this.pipe);
+      this.onPipeSet(tex);
     } else {
-      this.pipe.texture = tex;
-      this.setupSpriteSizes(this.pipe);
+      this.onPipeRenewed(tex);
     }
 
     this.applyRotation(rot);
     this.syncChildOrder();
+
+    // Setup water renderer
     this.waterRenderer?.setPipe(this.currentKind, this.currentRot);
     if (this.fillProgress > 0) {
       this.waterRenderer?.setFillProgress(this.fillProgress);
     } else {
       this.waterRenderer?.clearFill();
     }
+  }
+
+  private onPipeSet(tex: Texture) {
+    this.pipe = new Sprite(tex);
+    this.setupSpriteSizes(this.pipe);
+    this.pipe.zIndex = Z_ORDERS.pipes;
+    this.addChild(this.pipe);
+  }
+
+  private onPipeRenewed(tex: Texture) {
+    if (!this.pipe) {
+      log.error('Pipe not found when renewing');
+      return;
+    }
+
+    this.pipe.texture = tex;
+    this.setupSpriteSizes(this.pipe);
   }
 
   clearPipe(): void {
@@ -141,19 +156,6 @@ export class TileView extends Container {
     this.fillProgress = 0;
     this.syncChildOrder();
     this.waterRenderer?.clearPipe();
-  }
-
-  setHighlighted(on: boolean) {
-    if (on) {
-      if (!this.highlight) {
-        this.highlight = this.createHighlight();
-        this.addChild(this.highlight);
-        this.setChildIndex(this.highlight, this.children.length - 1);
-      }
-      this.highlight.visible = true;
-    } else if (this.highlight) {
-      this.highlight.visible = false;
-    }
   }
 
   setTileSize(size: number) {
@@ -176,6 +178,8 @@ export class TileView extends Container {
     }
   }
 
+  // --- Water Methods ---
+
   setWaterFillProgress(progress: number) {
     const clamped = Math.max(0, Math.min(1, progress));
 
@@ -187,6 +191,8 @@ export class TileView extends Container {
       return;
     }
 
+    // The renderer caches fill progress, so we short-circuit redundant updates
+    // to avoid forcing Pixi to re-tessellate geometry each frame.
     if (clamped === 0) {
       if (this.fillProgress !== 0) {
         this.fillProgress = 0;
@@ -218,6 +224,10 @@ export class TileView extends Container {
     this.waterRenderer?.commitPath(entry, exit);
   }
 
+  hasWaterFlow(): boolean {
+    return this.fillProgress > 0;
+  }
+
   // --- Helper Methods ---
 
   private applyRotation(rot: Rot): void {
@@ -225,6 +235,9 @@ export class TileView extends Container {
 
     this.currentRot = rot;
     this.pipe.rotation = (Math.PI / 2) * rot;
+    // We mirror the sprite rotation onto the water renderer to keep the visual
+    // flow aligned with the pipe texture, since water segments are rendered in
+    // local space.
     this.waterRenderer?.setRotation(this.currentRot);
     if (this.fillProgress > 0) {
       this.waterRenderer?.setFillProgress(this.fillProgress);
@@ -243,13 +256,6 @@ export class TileView extends Container {
       this.waterDynamic.zIndex = Z_ORDERS.water + 1;
     }
     this.sortChildren();
-  }
-
-  private createHighlight(): Graphics {
-    const g = new Graphics();
-    this.drawHighlight(g);
-    g.position.set(0, 0);
-    return g;
   }
 
   private refreshHighlight() {

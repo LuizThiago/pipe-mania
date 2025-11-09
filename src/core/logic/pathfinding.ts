@@ -21,6 +21,9 @@ export function findLongestConnectedPath(grid: GridState): PathNode[] {
       return;
     }
 
+    // Depth-first search lets us reuse the same recursion stack to explore every
+    // branch without allocating new path arrays for each fork. We rely on the
+    // `path` reference being mutated in place to keep memory churn low.
     visited.add(k);
     path.push(node);
 
@@ -70,6 +73,8 @@ function linkedNeighbors(grid: GridState, node: PathNode): PathNode[] {
       continue;
     }
 
+    // Only consider neighbors when the counterpart pipe exposes the opposing
+    // port, which prevents diagonal leakage and guarantees bidirectional flow.
     const theirPorts = getPorts(other.kind, other.rot ?? 0);
     if (theirPorts.includes(OPPOSED_DIRS[dir])) {
       result.push(neighbor);

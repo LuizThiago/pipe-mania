@@ -9,6 +9,6 @@ export interface GridPort {
   setWaterFlow(col: number, row: number, entry?: Dir): void;
   finalizeWaterSegment(col: number, row: number, entry: Dir | undefined, exit: Dir): void;
   setAllWaterFill(progress: number): void;
-  setHighlight(path: ReadonlyArray<{ col: number; row: number }>): void;
+  hasWaterFlow(col: number, row: number): boolean;
   on(event: 'grid:tileSelected', handler: (payload: GridTileSelectedPayload) => void): void;
 }

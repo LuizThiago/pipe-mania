@@ -1,7 +1,7 @@
 import { Graphics } from 'pixi.js';
 import type { Dir, PipeKind, Rot } from '@core/types';
 import type { GameConfig } from '@core/config';
-import { parseColor } from '../utils/color';
+import { parseColor } from './utils/color';
 import { getPorts } from '@core/logic/pipes';
 import { OPPOSED_DIRS } from '@core/constants';
 
@@ -139,6 +139,8 @@ export class TileWaterRenderer {
       return;
     }
 
+    // Deriving connections on the fly keeps us compatible with rotated sprites
+    // without storing precomputed shapes for each variant, reducing texture churn.
     const connections = this.getActiveConnections();
     if (!this.entryDir) {
       this.entryDir = connections[0];
@@ -149,6 +151,8 @@ export class TileWaterRenderer {
       return;
     }
 
+    // The fill is rendered in the dynamic layer until the tile is committed,
+    // mirroring the physical process of water flowing through a pipe.
     this.dynamicGraphics.visible = true;
     this.dynamicGraphics.fill({ color: this.color, alpha: this.alpha });
     this.drawPath(this.dynamicGraphics, entry, exit, this.fillProgress, geometry);
@@ -181,6 +185,8 @@ export class TileWaterRenderer {
       return;
     }
 
+    // We translate the overall fill progress into partial segments so that
+    // curves animate naturally instead of abruptly switching to the exit arm.
     const fillLength = normalized * totalLength;
 
     const entryFill = Math.min(entryLength, fillLength);
@@ -264,6 +270,9 @@ export class TileWaterRenderer {
       return;
     }
 
+    // Curves fill in two phases: first we traverse the entry quarter circle,
+    // then we spill into the exit side. This sequencing keeps the flow visually
+    // consistent with the physical pipe shape.
     const firstPhase = Math.min(clamped, 0.5);
     if (firstPhase > 0 && entry) {
       const ratio = Math.min(1, firstPhase / 0.5);
@@ -412,6 +421,8 @@ export class TileWaterRenderer {
     const horizontalArm = Math.max(0, centerStartX - leftStart);
     const verticalArm = Math.max(0, centerStartY - topStart);
 
+    // These precomputed values let us render every pipe variant with simple
+    // rect primitives, which is faster on the GPU than dynamic Bézier paths.
     return {
       size,
       edgeInset,

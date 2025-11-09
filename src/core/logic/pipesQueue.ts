@@ -33,6 +33,8 @@ export class PipesQueue {
 
   popAndPushPipe(): PipeQueueItem {
     const removedPipe = this.pipes.shift()!;
+    // Cycling the queue by reusing the array avoids extra allocations and keeps
+    // the preview list stable for the UI that subscribes to snapshot updates.
     this.pipes.push(this.createRandomPipeItem());
     return removedPipe;
   }

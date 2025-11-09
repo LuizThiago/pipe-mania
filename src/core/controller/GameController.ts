@@ -4,7 +4,7 @@ import { log } from '@core/logger';
 import { buildInitialBoard } from '@core/logic/boardBuilder';
 import type { RNG } from '@core/logic/boardBuilder';
 import { findLongestConnectedPath } from '@core/logic/pathfinding';
-import type { Dir, PathNode, PipeKind, Rot, TileState } from '@core/types';
+import type { Dir, PipeKind, Rot, TileState } from '@core/types';
 import type { GridPort } from '@core/ports/GridPort';
 import { PipesQueue, type PipeQueueItem } from '@core/logic/pipesQueue';
 import { getPorts } from '@core/logic/pipes';
@@ -104,6 +104,9 @@ export class GameController {
     let chosen: TileCoordinate | undefined;
     let chosenRot: Rot | undefined;
 
+    // Random sampling keeps the placement unpredictable while naturally rejecting
+    // dead ends. I intentionally mutate the candidates list to avoid revisiting
+    // positions that were already proven invalid for every rotation.
     while (candidates.length > 0 && (!chosen || chosenRot === undefined)) {
       const index = Math.floor(this.rng() * candidates.length);
       const candidate = candidates.splice(index, 1)[0];
@@ -180,7 +183,7 @@ export class GameController {
       return false;
     }
 
-    return !this.gridData[row][col].blocked;
+    return !this.grid.isBlocked(col, row) && !this.grid.hasWaterFlow(col, row);
   }
 
   private async tryPlacePipe(
@@ -211,12 +214,7 @@ export class GameController {
   }
 
   private onPlace() {
-    const best = findLongestConnectedPath(this.gridData);
-    this.applyHighlight(best);
-  }
-
-  private applyHighlight(path: PathNode[]) {
-    this.grid.setHighlight(path);
+    findLongestConnectedPath(this.gridData);
   }
 
   private validateConfig(): boolean {
@@ -256,6 +254,10 @@ export class GameController {
     let current: TileCoordinate | undefined = { ...this.startTile };
     let incoming: Dir | undefined = undefined;
 
+    // The traversal walks the network tile by tile, relying on `incoming` and the
+    // historical flow map to prevent oscillations when a pipe has more than one
+    // valid exit (e.g. crosses). This keeps the simulation deterministic without
+    // maintaining a full visited set.
     while (this.isFlowing && current) {
       const state = this.gridData[current.row]?.[current.col];
       if (!state || !state.kind || state.kind === 'empty') {
@@ -326,6 +328,9 @@ export class GameController {
       return undefined;
     }
 
+    // Cross pipes can split water in multiple directions; we prioritize the
+    // straight-through direction to preserve momentum, only falling back to the
+    // secondary arms when the primary path was already consumed earlier.
     if (kind === 'cross') {
       const primary = OPPOSED_DIRS[incoming];
       if (!filledDirs.has(primary)) {
@@ -373,6 +378,9 @@ export class GameController {
     this.grid.setWaterFlow(col, row, entry);
     this.grid.setWaterFillProgress(col, row, 0);
 
+    // Using requestAnimationFrame keeps the fill animation in sync with the
+    // renderer while the Promise interface lets the caller await the visual
+    // completion before advancing the fluid simulation to the next tile.
     return new Promise<void>(resolve => {
       let startTime: number | undefined;
 

@@ -115,7 +115,7 @@ export class GridView extends Container implements GridPort {
     return this.tiles[y][x];
   }
 
-  // --- Block Getter/Setter Methods ---
+  // --- Getter/Setter Methods ---
 
   setAsBlocked(col: number, row: number) {
     const tile = this.tiles[row]?.[col];
@@ -131,11 +131,20 @@ export class GridView extends Container implements GridPort {
     return !!this.blockedTiles[row]?.[col];
   }
 
-  // --- Path Highlighting Methods ---
-  setHighlight(path: ReadonlyArray<{ col: number; row: number }>) {
-    for (const row of this.tiles) for (const t of row) t.setHighlighted(false);
-    for (const n of path) this.tiles[n.row][n.col]?.setHighlighted(true);
+  async setPipe(col: number, row: number, kind: PipeKind, rot: Rot) {
+    const tile = this.tiles[row]?.[col];
+    if (!tile) {
+      return;
+    }
+    await tile.setPipe(kind, rot);
   }
+
+  hasWaterFlow(col: number, row: number): boolean {
+    const tile = this.tiles[row]?.[col];
+    return tile?.hasWaterFlow() ?? false;
+  }
+
+  // --- Size Calculation Methods ---
 
   private get contentWidth(): number {
     return this.cols * this.tileSize + (this.cols - 1) * this.gap;
@@ -161,7 +170,7 @@ export class GridView extends Container implements GridPort {
     });
   }
 
-  // --- TMP Methods ---
+  // --- Water Methods ---
 
   forEachTile(cb: (t: TileView) => void) {
     for (const row of this.tiles) {
@@ -173,14 +182,6 @@ export class GridView extends Container implements GridPort {
 
   setFillAll(p: number) {
     this.setAllWaterFill(p);
-  }
-
-  async setPipe(col: number, row: number, kind: PipeKind, rot: Rot) {
-    const tile = this.tiles[row]?.[col];
-    if (!tile) {
-      return;
-    }
-    await tile.setPipe(kind, rot);
   }
 
   setWaterFillProgress(col: number, row: number, progress: number) {

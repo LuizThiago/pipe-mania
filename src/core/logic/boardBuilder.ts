@@ -36,6 +36,8 @@ export function buildInitialBoard({
   const totalTiles = rows * cols;
   const maxBlockable = Math.max(totalTiles - 1, 0);
   const targetBlocks = Math.min(Math.floor(totalTiles * blockedTilesPercentage), maxBlockable);
+  // Shuffling the full coordinate list once ensures sampling without replacement,
+  // which keeps the blocked distribution uniform without repeatedly probing random cells.
   const cells = shuffleCells(getAllCells(rows, cols), rng);
   const blockedTiles = cells.slice(0, targetBlocks);
 
@@ -68,6 +70,8 @@ function shuffleCells(
   cells: Array<{ col: number; row: number }>,
   rng: RNG
 ): Array<{ col: number; row: number }> {
+  // Fisher–Yates shuffle preserves uniform randomness even with a custom RNG,
+  // which makes it suitable for deterministic seeds during tests.
   for (let i = cells.length - 1; i > 0; i--) {
     const j = Math.min(Math.floor(rng() * (i + 1)), i);
     [cells[i], cells[j]] = [cells[j], cells[i]];

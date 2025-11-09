@@ -17,6 +17,8 @@ export function getPorts(kind: PipeKind, rot: Rot): Dir[] {
     return [];
   }
 
+  // Rotations are applied by shifting the base direction indices; this keeps the
+  // mapping table small while guaranteeing clockwise rotation semantics.
   return dirs.map(dir => rotateDir(dir, rot));
 }
 

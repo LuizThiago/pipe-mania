@@ -35,3 +35,13 @@
 - Updated `GridView` to implement that interface, keeping rendering separate from orchestration.
 - Having the **GameController** in place clarified responsibilities across the system, and the link detection logic proved how solid foundations make later features easier to plug in.
 - Next up, I’ll probably move toward water feature or score logic, now that the board itself behaves as expected.
+
+### November 8, 2025
+
+- I improved the overall **layout** today. The grid is now properly centered and scales with the window, making the game finally feel balanced on different screen sizes.
+- Added the **queue system** that shows the upcoming tiles to the player. It’s a small detail, but it really helps visualize what’s coming next.
+- Implemented the **water fill rendering** for pipe tiles. I first tried using sprites with masks, but that approach turned out messy and unreliable. I switched to drawing with **Pixi Graphics**, splitting each fill into three segments (start, middle, end), which gave me full control over how the water expands.
+- The **cross tile** caused a nasty problem since it can have two inputs and two outputs, creating loops. I solved it by keeping **two separate water renders**: one dynamic (for animation) and one static (for storing the final filled shape). When an animation finishes, I copy the shape to the static graphic and hide the dynamic one. That way, if new water arrives from another direction, I can reuse the dynamic renderer without touching the old path.
+- No doubt, this **water animation system** was the most complex part so far. It took several iterations to get right.
+- Also added some randomness: the **start tile** and its **rotation** are now randomized at the beginning of each round.
+- Finally, implemented **sequential flow logic**. Now the water spreads through connected tiles in proper order, starting from the start tile, instead of everything animating at once. It looks and feels so much better.

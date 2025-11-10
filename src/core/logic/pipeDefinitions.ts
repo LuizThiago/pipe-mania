@@ -1,5 +1,14 @@
 import type { Dir } from '@core/types';
 
+/**
+ * Flow strategy determines how water chooses exit direction(s) in a pipe.
+ * This eliminates hardcoded logic in WaterFlowController.
+ */
+export type FlowStrategy =
+  | 'first-port' // Always exits through first port (for start pipes)
+  | 'straight-through' // Prioritizes opposite direction, then alternates (for cross pipes)
+  | 'any-available'; // Exits through first available port that isn't the entrance (default)
+
 export type PipeDefinition = {
   readonly kind: string; // Unique identifier for this pipe type
   readonly displayName: string; // Display name for UI/debugging
@@ -7,6 +16,7 @@ export type PipeDefinition = {
   readonly assetPath: string; // Path to the sprite asset
   readonly randomizable: boolean; // Whether this pipe can be randomly generated in the queue
   readonly maxFlowVisits: number; // Maximum number of times water can flow through this pipe (for scoring)
+  readonly flowStrategy: FlowStrategy; // How water chooses exit direction
 };
 
 export const PIPE_DEFINITIONS = {
@@ -17,6 +27,7 @@ export const PIPE_DEFINITIONS = {
     assetPath: '/assets/pipes/tile.png',
     randomizable: false,
     maxFlowVisits: 0,
+    flowStrategy: 'any-available',
   },
 
   straight: {
@@ -26,6 +37,7 @@ export const PIPE_DEFINITIONS = {
     assetPath: '/assets/pipes/straight-pipe.png',
     randomizable: true,
     maxFlowVisits: 1,
+    flowStrategy: 'any-available', // Enter from any side, exit through the other
   },
 
   curve: {
@@ -35,6 +47,7 @@ export const PIPE_DEFINITIONS = {
     assetPath: '/assets/pipes/curved-pipe.png',
     randomizable: true,
     maxFlowVisits: 1,
+    flowStrategy: 'any-available', // Enter from one side, exit through the other
   },
 
   cross: {
@@ -44,6 +57,7 @@ export const PIPE_DEFINITIONS = {
     assetPath: '/assets/pipes/cross-pipe.png',
     randomizable: true,
     maxFlowVisits: 2, // Can be visited twice (horizontal + vertical)
+    flowStrategy: 'straight-through', // Water goes straight through, then can use alternate path
   },
 
   start: {
@@ -53,6 +67,7 @@ export const PIPE_DEFINITIONS = {
     assetPath: '/assets/pipes/start-pipe.png',
     randomizable: false,
     maxFlowVisits: 0, // Start tile doesn't count for scoring
+    flowStrategy: 'first-port', // Always exits through its single port
   },
 } as const;
 
@@ -89,4 +104,11 @@ export function getMaxFlowVisits(kind: PipeKind): number {
 
 export function isRandomizable(kind: PipeKind): boolean {
   return PIPE_DEFINITIONS[kind].randomizable;
+}
+
+/**
+ * Get the flow strategy for a pipe kind
+ */
+export function getFlowStrategy(kind: PipeKind): FlowStrategy {
+  return PIPE_DEFINITIONS[kind].flowStrategy;
 }

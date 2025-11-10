@@ -4,6 +4,7 @@ import { OPPOSED_DIRS } from '@core/constants';
 import type { Dir, PipeKind, Rot, TileState, FlowTerminationReason } from '@core/types';
 import type { GridPort } from '@core/ports/GridPort';
 import type { ScoreController } from './ScoreController';
+import { getFlowStrategy } from '@core/logic/pipeDefinitions';
 
 type TileCoordinate = { col: number; row: number };
 
@@ -105,24 +106,28 @@ export class WaterFlowController {
   }
 
   // Resolves the next direction to flow out of a tile.
+  // Uses the flow strategy defined in pipeDefinitions instead of hardcoded logic.
   private determineExitDirection(
     kind: PipeKind,
     rot: Rot,
     incoming: Dir | undefined,
     filledDirs: Set<Dir>
   ): Dir | undefined {
-    const ports = getPorts(kind, rot); // Get the available exit directions for the current tile
+    const ports = getPorts(kind, rot);
+    const strategy = getFlowStrategy(kind);
 
-    if (kind === 'start') {
+    // Strategy: first-port (for start pipes)
+    if (strategy === 'first-port') {
       return ports[0];
     }
 
+    // All other strategies require an incoming direction
     if (incoming === undefined || !ports.includes(incoming)) {
       return undefined;
     }
 
-    if (kind === 'cross') {
-      // Cross pipes prioritize straight-through flow, then fall back to alternate arms if needed.
+    // Strategy: straight-through (for cross pipes)
+    if (strategy === 'straight-through') {
       const primary = OPPOSED_DIRS[incoming];
       if (!filledDirs.has(primary)) {
         return primary;
@@ -133,7 +138,8 @@ export class WaterFlowController {
       return alternate ?? primary;
     }
 
-    // For other pipe types, we find the first available direction that hasn't been used yet.
+    // Strategy: any-available (default for most pipes)
+    // Find the first available direction that hasn't been used yet
     const candidate = ports.find(dir => dir !== incoming && !filledDirs.has(dir));
     return candidate ?? ports.find(dir => dir !== incoming) ?? incoming;
   }

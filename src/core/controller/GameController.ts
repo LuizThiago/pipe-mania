@@ -9,6 +9,7 @@ import type { GridPort } from '@core/ports/GridPort';
 import { PipesQueue, type PipeQueueItem } from '@core/logic/pipesQueue';
 import { getPorts } from '@core/logic/pipes';
 import { ScoreController } from './ScoreController';
+import { createSeededRng, hashStringToSeed } from '@core/rng';
 import type { FlowCompletionPayload } from '@core/types';
 import { WaterFlowController } from './WaterFlowController';
 
@@ -18,7 +19,7 @@ type TileCoordinate = { col: number; row: number };
 
 export class GameController {
   private readonly placeablePipes: ReadonlyArray<PlaceablePipe>;
-  private readonly pipesQueue: PipesQueue;
+  private pipesQueue: PipesQueue;
   private gridData: TileState[][] = [];
   private startTile?: TileCoordinate;
   private stage: number = 1;
@@ -31,6 +32,10 @@ export class GameController {
     if (cb) cb(this.pipesQueue.snapshotPipes());
   }
 
+  private rngGrid: RNG = Math.random;
+  private rngStart: RNG = Math.random;
+  private rngQueue: RNG = Math.random;
+
   constructor(
     private readonly grid: GridPort,
     private config: GameConfig,
@@ -42,6 +47,9 @@ export class GameController {
     }
 
     this.placeablePipes = this.resolvePlaceablePipes();
+
+    this.initRngForStage();
+
     this.pipesQueue = this.createPipesQueue();
     this.scoreController = new ScoreController(this.config.gameplay.scoring);
     this.updateDifficultyForCurrentStage();
@@ -74,7 +82,7 @@ export class GameController {
   }
 
   private createPipesQueue(): PipesQueue {
-    return new PipesQueue(this.config.queue.queueSize, this.rng, this.placeablePipes);
+    return new PipesQueue(this.config.queue.queueSize, this.rngQueue, this.placeablePipes);
   }
 
   private async buildBoard() {
@@ -85,7 +93,7 @@ export class GameController {
       rows,
       cols,
       blockedTilesPercentage,
-      rng: this.rng,
+      rng: this.rngGrid,
     });
 
     this.gridData = gridData;
@@ -117,7 +125,7 @@ export class GameController {
     let chosenRot: Rot | undefined;
 
     while (candidates.length > 0 && (!chosen || chosenRot === undefined)) {
-      const index = Math.floor(this.rng() * candidates.length);
+      const index = Math.floor(this.rngStart() * candidates.length);
       const candidate = candidates.splice(index, 1)[0];
       const validRotations = this.getValidStartRotations(candidate);
       if (validRotations.length === 0) {
@@ -125,7 +133,7 @@ export class GameController {
       }
 
       chosen = candidate;
-      chosenRot = validRotations[Math.floor(this.rng() * validRotations.length)];
+      chosenRot = validRotations[Math.floor(this.rngStart() * validRotations.length)];
     }
 
     if (!chosen || chosenRot === undefined) {
@@ -216,7 +224,6 @@ export class GameController {
 
     const state = this.gridData[row]?.[col];
     if (state?.kind === 'start') {
-      // Safety guard: do not allow overwriting the start tile
       return false;
     }
 
@@ -329,11 +336,13 @@ export class GameController {
 
   setStage(next: number): void {
     this.stage = Math.max(1, Math.floor(next));
+    this.initRngForStage();
     this.updateDifficultyForCurrentStage();
   }
 
   advanceStage(): void {
     this.stage = this.stage + 1;
+    this.initRngForStage();
     this.updateDifficultyForCurrentStage();
   }
 
@@ -346,13 +355,11 @@ export class GameController {
     const start = diff.blockedPercentStart;
     const per = diff.blockedPercentPerStage;
     const max = diff.blockedPercentMax;
-    // Stage 1 => start, Stage N => start + (N-1)*per
     const pct = start + Math.max(0, this.stage - 1) * per;
     return Math.max(0, Math.min(max, pct));
   }
 
   private updateDifficultyForCurrentStage(): void {
-    // Update target flow length based on stage
     const diff = this.config.gameplay.difficulty;
     const base = diff.targetLengthStart;
     const inc = diff.targetLengthPerStage;
@@ -366,7 +373,6 @@ export class GameController {
   }
 
   getAutoStartDelayMs(): number {
-    // Base delay; ensure finite, non-negative
     const baseRaw = this.config.water.autoStartDelayMs ?? 3000;
     const base = Number.isFinite(baseRaw) && baseRaw >= 0 ? baseRaw : 3000;
 
@@ -375,7 +381,6 @@ export class GameController {
 
     const diff = this.config.gameplay.difficulty;
     if (!diff || !diff.flowAutoStart) {
-      // Clamp to cap even without difficulty overrides
       return Math.min(base, HARD_CAP_MS);
     }
 
@@ -401,15 +406,13 @@ export class GameController {
   }
 
   async resetStage(): Promise<void> {
-    // Clear all tiles (pipes and water)
     for (let row = 0; row < this.gridData.length; row++) {
       for (let col = 0; col < (this.gridData[row]?.length ?? 0); col++) {
         try {
           await this.grid.setPipe(col, row, 'empty', 0);
         } catch {
-          // Best-effort; continue clearing others
+          log.warn('Failed to clear pipe at', { col, row });
         }
-        // Reset in-memory state
         if (this.gridData[row] && this.gridData[row][col]) {
           this.gridData[row][col].kind = 'empty';
           this.gridData[row][col].rot = 0 as Rot;
@@ -421,14 +424,31 @@ export class GameController {
     this.grid.clearAllBlocks();
     this.startTile = undefined;
 
-    // Rebuild board and start tile
     await this.buildBoard();
 
-    // Reset the queue
-    this.pipesQueue.reset();
+    this.pipesQueue = this.createPipesQueue();
     this._onPipesQueueChange?.(this.pipesQueue.snapshotPipes());
 
-    // Re-enable input
     this.inputLocked = false;
+  }
+
+  // Initializes per-stage RNG substreams derived from a base seed.
+  // If no base seed is provided, falls back to Math.random for each stream.
+  private initRngForStage(): void {
+    const baseSeed = this.config.gameplay?.rngSeed;
+    if (typeof baseSeed !== 'number') {
+      this.rngGrid = this.rng;
+      this.rngStart = this.rng;
+      this.rngQueue = this.rng;
+      return;
+    }
+    const stageStr = String(this.stage);
+    const gridSeed = (baseSeed ^ hashStringToSeed('grid:' + stageStr)) >>> 0;
+    const startSeed = (baseSeed ^ hashStringToSeed('start:' + stageStr)) >>> 0;
+    const queueSeed = (baseSeed ^ hashStringToSeed('queue:' + stageStr)) >>> 0;
+
+    this.rngGrid = createSeededRng(gridSeed);
+    this.rngStart = createSeededRng(startSeed);
+    this.rngQueue = createSeededRng(queueSeed);
   }
 }

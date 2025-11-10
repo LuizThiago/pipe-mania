@@ -9,6 +9,7 @@ import { parseColor } from './utils/color';
 import { HudView } from './HudView';
 import type { FlowCompletionPayload } from '@core/types';
 import { EndModalView } from './EndModalView';
+import { createSeededRng } from '@core/rng';
 
 export class Scene extends Container {
   private config = loadConfig();
@@ -39,7 +40,10 @@ export class Scene extends Container {
 
     this.gridView = await this.createGrid(rows, cols);
 
-    this.gameController = new GameController(this.gridView, this.config);
+    const seed = this.config.gameplay?.rngSeed;
+    const rng = typeof seed === 'number' ? createSeededRng(seed) : Math.random;
+
+    this.gameController = new GameController(this.gridView, this.config, rng);
     await this.gameController.init();
     await this.createQueue(this.gameController);
     this.createHud(this.gameController);

@@ -109,6 +109,7 @@ export const DefaultConfig: GameConfig = {
     backgroundColor: '#CBE1DC',
   },
   gameplay: {
+    rngSeed: 1234,
     allowedPipes: ['straight', 'curve', 'cross'],
     difficulty: {
       blockedPercentStart: 0,

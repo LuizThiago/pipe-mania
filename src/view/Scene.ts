@@ -334,7 +334,7 @@ export class Scene extends Container {
     }
     this.centerContent(layout);
 
-    // Ghost scales with grid tile size
+    // Ghost
     this.ghost?.setTileSize(tileSize);
   }
 

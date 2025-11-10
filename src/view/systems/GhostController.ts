@@ -18,7 +18,6 @@ export class GhostController {
   init() {
     if (this.ghost) return;
 
-    // Convert hex color string to number
     const colorString = this.config.animations?.ghostOutlineColor ?? '#2b80ff';
     const colorNumber = parseInt(colorString.replace('#', ''), 16);
 
@@ -92,7 +91,6 @@ export class GhostController {
   updateFromQueueFirstItem(first: PipeQueueItem | undefined, tileSize: number) {
     if (!first || !this.ghost) return;
     this.ghost.setTileSize(tileSize);
-    // Ghost is now just an outline, no need to set pipe type/rotation
   }
 
   setTileSize(tileSize: number) {

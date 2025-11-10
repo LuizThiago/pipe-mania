@@ -267,10 +267,6 @@ export class TileWaterRenderer {
       return;
     }
 
-    // Create smooth overlap between entry and exit phases
-    // Entry arm fills from 0% to 60% (completes at 60%)
-    // Exit arm starts at 40% and fills to 100%
-    // This 20% overlap creates a smoother visual transition
     const entryStart = 0;
     const entryEnd = 0.6;
     const exitStart = 0.4;

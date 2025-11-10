@@ -1,9 +1,5 @@
 import type { Dir } from '@core/types';
 
-/**
- * Flow strategy determines how water chooses exit direction(s) in a pipe.
- * This eliminates hardcoded logic in WaterFlowController.
- */
 export type FlowStrategy =
   | 'first-port' // Always exits through first port (for start pipes)
   | 'straight-through' // Prioritizes opposite direction, then alternates (for cross pipes)
@@ -106,9 +102,6 @@ export function isRandomizable(kind: PipeKind): boolean {
   return PIPE_DEFINITIONS[kind].randomizable;
 }
 
-/**
- * Get the flow strategy for a pipe kind
- */
 export function getFlowStrategy(kind: PipeKind): FlowStrategy {
   return PIPE_DEFINITIONS[kind].flowStrategy;
 }

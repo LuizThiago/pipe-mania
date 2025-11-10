@@ -106,7 +106,6 @@ export class WaterFlowController {
   }
 
   // Resolves the next direction to flow out of a tile.
-  // Uses the flow strategy defined in pipeDefinitions instead of hardcoded logic.
   private determineExitDirection(
     kind: PipeKind,
     rot: Rot,
@@ -121,7 +120,6 @@ export class WaterFlowController {
       return ports[0];
     }
 
-    // All other strategies require an incoming direction
     if (incoming === undefined || !ports.includes(incoming)) {
       return undefined;
     }
@@ -139,7 +137,6 @@ export class WaterFlowController {
     }
 
     // Strategy: any-available (default for most pipes)
-    // Find the first available direction that hasn't been used yet
     const candidate = ports.find(dir => dir !== incoming && !filledDirs.has(dir));
     return candidate ?? ports.find(dir => dir !== incoming) ?? incoming;
   }

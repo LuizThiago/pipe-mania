@@ -1,20 +1,23 @@
-import type { Dir, PipeKind } from './types';
+import type { Dir } from './types';
+import {
+  ALL_PIPE_KINDS as PIPE_KINDS_FROM_DEFINITIONS,
+  getRandomizablePipeKinds,
+  PIPE_DEFINITIONS,
+  type PipeKind,
+} from './logic/pipeDefinitions';
 
-export const ALL_PIPE_KINDS = ['empty', 'straight', 'curve', 'cross', 'start'] as const;
+export const ALL_PIPE_KINDS = PIPE_KINDS_FROM_DEFINITIONS;
 
-export const RANDOMIZABLE_PIPE_KINDS = ALL_PIPE_KINDS.filter(
-  (kind): kind is Exclude<PipeKind, 'empty' | 'start'> => kind !== 'empty' && kind !== 'start'
-) as readonly Exclude<PipeKind, 'empty' | 'start'>[];
+export const RANDOMIZABLE_PIPE_KINDS = getRandomizablePipeKinds() as readonly Exclude<
+  PipeKind,
+  'empty' | 'start'
+>[];
 
 export const WATER_COLOR = 0x3399ff;
 
-export const ASSETS = {
-  empty: '/assets/pipes/tile.png',
-  straight: '/assets/pipes/straight-pipe.png',
-  curve: '/assets/pipes/curved-pipe.png',
-  cross: '/assets/pipes/cross-pipe.png',
-  start: '/assets/pipes/start-pipe.png',
-} as const;
+export const ASSETS = Object.fromEntries(
+  ALL_PIPE_KINDS.map(kind => [kind, PIPE_DEFINITIONS[kind].assetPath])
+) as Record<PipeKind, string>;
 
 export const Z_ORDERS = {
   tiles_bg: 0,

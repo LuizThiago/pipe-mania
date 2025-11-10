@@ -1,6 +1,7 @@
 import type { GameConfig } from '@core/config';
 import { log } from '@core/logger';
 import type { FlowCompletionPayload, FlowTerminationReason, PipeKind } from '@core/types';
+import { getMaxFlowVisits } from '@core/logic/pipeDefinitions';
 
 type PipePlacementContext = {
   wasReplacement: boolean;
@@ -155,10 +156,7 @@ export class ScoreController {
   }
 
   private resolveMaxVisits(kind: PipeKind): number {
-    if (kind === 'cross') {
-      return 2;
-    }
-    return 1;
+    return getMaxFlowVisits(kind);
   }
 
   private applyScoreDelta(delta: number, context: string): void {

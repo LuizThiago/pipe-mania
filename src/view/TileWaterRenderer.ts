@@ -180,12 +180,14 @@ export class TileWaterRenderer {
     // We translate the overall fill progress into partial segments so that
     // curves animate naturally instead of abruptly switching to the exit arm.
     const fillLength = normalized * totalLength;
-
     const entryFill = Math.min(entryLength, fillLength);
+
+    // Draw the entry arm
     if (entry && entryFill > 0) {
       this.drawEntryArm(target, entry, entryFill, geometry);
     }
 
+    // Draw the center
     const centerStart = entryLength;
     const centerFill = Math.min(centerLength, Math.max(0, fillLength - centerStart));
     const centerProgress = centerLength > 0 ? centerFill / centerLength : 0;
@@ -193,6 +195,7 @@ export class TileWaterRenderer {
       this.drawCenter(target, entry, exit, centerProgress, geometry, isCurve);
     }
 
+    // Draw the exit arm
     const exitStart = centerStart + centerLength;
     const exitFill = Math.min(exitLength, Math.max(0, fillLength - exitStart));
     if (exitFill > 0) {

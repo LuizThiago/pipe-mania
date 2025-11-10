@@ -1,6 +1,6 @@
-import type { ALL_PIPE_KINDS } from './constants';
+import type { PipeKind as PipeKindImport } from './logic/pipeDefinitions';
 
-export type PipeKind = (typeof ALL_PIPE_KINDS)[number];
+export type PipeKind = PipeKindImport;
 
 export type Rot = 0 | 1 | 2 | 3; // 0, 90, 180, 270 degrees
 

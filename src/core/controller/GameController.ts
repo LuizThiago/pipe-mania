@@ -27,9 +27,15 @@ export class GameController {
   private readonly scoreController: ScoreController;
   private readonly waterFlowController: WaterFlowController;
   private _onPipesQueueChange?: (q: readonly PipeQueueItem[]) => void;
+  private _onBeforeQueueShift?: (info: { col: number; row: number }) => Promise<void> | void;
   set onPipesQueueChange(cb: ((q: readonly PipeQueueItem[]) => void) | undefined) {
     this._onPipesQueueChange = cb;
     if (cb) cb(this.pipesQueue.snapshotPipes());
+  }
+  set onBeforeQueueShift(
+    cb: ((info: { col: number; row: number }) => Promise<void> | void) | undefined
+  ) {
+    this._onBeforeQueueShift = cb;
   }
 
   private rngGrid: RNG = Math.random;
@@ -232,6 +238,26 @@ export class GameController {
     try {
       await tile.setPipe(pipe.kind, pipe.rot);
 
+      // Allow view to animate first queue item before we shift the queue
+      if (this._onBeforeQueueShift) {
+        try {
+          await this._onBeforeQueueShift({ col, row });
+        } catch (callbackError) {
+          // Restore the previous state to keep view and model consistent
+          const prevKind = state?.kind ?? 'empty';
+          const prevRot = state?.rot ?? (0 as Rot);
+          if (wasReplacement) {
+            await tile.setPipe(prevKind, prevRot);
+            this.gridData[row][col].kind = prevKind;
+            this.gridData[row][col].rot = prevRot;
+          } else {
+            await tile.setPipe('empty', 0);
+            this.gridData[row][col].kind = 'empty';
+            this.gridData[row][col].rot = 0 as Rot;
+          }
+          throw callbackError;
+        }
+      }
       this.gridData[row][col].kind = pipe.kind;
       this.gridData[row][col].rot = pipe.rot;
 
@@ -403,6 +429,10 @@ export class GameController {
 
   setInputEnabled(enabled: boolean): void {
     this.inputLocked = !enabled;
+  }
+
+  isInputEnabled(): boolean {
+    return !this.inputLocked;
   }
 
   async resetStage(): Promise<void> {

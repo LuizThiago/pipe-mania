@@ -10,6 +10,8 @@ import { HudView } from './HudView';
 import type { FlowCompletionPayload } from '@core/types';
 import { EndModalView } from './EndModalView';
 import { createSeededRng } from '@core/rng';
+import { GhostController } from './systems/GhostController';
+import { QueueAnimator } from './systems/QueueAnimator';
 
 export class Scene extends Container {
   private config = loadConfig();
@@ -24,6 +26,8 @@ export class Scene extends Container {
   private endModal?: EndModalView;
   private currentLayout?: SceneLayout;
   private lastOutcomeIsWin?: boolean;
+  private ghost?: GhostController;
+  private queueAnimator?: QueueAnimator;
 
   constructor() {
     super();
@@ -39,6 +43,9 @@ export class Scene extends Container {
     const { cols, rows } = this.config.grid;
 
     this.gridView = await this.createGrid(rows, cols);
+    // Systems
+    this.ghost = new GhostController(this.contentRoot, this.gridView, this.config);
+    this.ghost.init();
 
     const seed = this.config.gameplay?.rngSeed;
     const rng = typeof seed === 'number' ? createSeededRng(seed) : Math.random;
@@ -46,6 +53,10 @@ export class Scene extends Container {
     this.gameController = new GameController(this.gridView, this.config, rng);
     await this.gameController.init();
     await this.createQueue(this.gameController);
+    if (this.queueView && this.gameController && this.ghost) {
+      this.queueAnimator = new QueueAnimator(this.queueView, this.gameController, this.ghost);
+      this.queueAnimator.attach();
+    }
     this.createHud(this.gameController);
     this.hudView?.updateStage(this.gameController.getStage());
     this.hudView?.updateTargetLength(this.gameController.getTargetFlowLength());
@@ -107,7 +118,8 @@ export class Scene extends Container {
       qGap,
       pad,
       radius,
-      parseColor(this.config.queue.queueBackgroundColor ?? '#DDEEEF')
+      parseColor(this.config.queue.queueBackgroundColor ?? '#DDEEEF'),
+      this.config
     );
     await this.queueView.init();
 
@@ -115,7 +127,24 @@ export class Scene extends Container {
 
     gameController.onPipesQueueChange = queuePipes => {
       this.queueView?.setQueue(queuePipes);
+      const first = queuePipes[0];
+      if (first && this.gridView && this.ghost) {
+        this.ghost.updateFromQueueFirstItem(first, this.gridView.getTileSize());
+        if (!this.queueAnimator?.isAnimating()) {
+          this.ghost.show();
+        }
+      }
     };
+
+    this.gridView?.on('grid:bgTap', () => {
+      if (!this.gameController?.isInputEnabled()) return;
+      if (!this.gameController || !this.gridView || !this.ghost) return;
+      const cell = this.ghost.getSnappedCell();
+      if (!cell) return;
+      const tile = this.gridView.getTile(cell.col, cell.row);
+      if (!tile) return;
+      this.gridView?.emit('grid:tileSelected', { col: cell.col, row: cell.row, tile });
+    });
   }
 
   private createHud(gameController: GameController) {
@@ -173,6 +202,10 @@ export class Scene extends Container {
       this.endModal.position.set(0, this.hudTopReserve / 2);
     }
     this.endModal.visible = true;
+
+    // Disable ghost interactions while modal is open
+    this.ghost?.disable();
+    this.ghost?.hide();
   }
 
   private async handleEndModalAction() {
@@ -190,11 +223,13 @@ export class Scene extends Container {
         this.hudView?.updateStage(this.gameController.getStage());
         this.hudView?.updateTargetLength(this.gameController.getTargetFlowLength());
       }
+      this.queueView?.clear();
       await this.gameController?.resetStage();
       this.hudView?.updateFlowProgress(0);
       this.hudView?.updateFlowCountdown(0);
       this.gameController?.setInputEnabled(true);
       this.scheduleAutoStart();
+      this.ghost?.enable();
     } catch (err) {
       console.error('Failed to reset stage:', err);
       this.gameController?.setInputEnabled(true);
@@ -298,6 +333,9 @@ export class Scene extends Container {
       this.hudTopReserve = Math.max(96, this.hudView.getTopReserve());
     }
     this.centerContent(layout);
+
+    // Ghost scales with grid tile size
+    this.ghost?.setTileSize(tileSize);
   }
 
   private getVisibleQueueSlots(): number {
@@ -373,6 +411,8 @@ export class Scene extends Container {
       cancelAnimationFrame(this.autoStartFrameId);
       this.autoStartFrameId = undefined;
     }
+    this.queueAnimator?.detach();
+    this.ghost?.destroy();
     super.destroy(options as any);
   }
 }

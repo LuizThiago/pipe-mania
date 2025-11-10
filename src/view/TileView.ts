@@ -4,6 +4,7 @@ import type { Dir, PipeKind, Rot } from '@core/types';
 import { log } from '@core/logger';
 import type { GameConfig } from '@core/config';
 import { TileWaterRenderer } from './TileWaterRenderer';
+import { animate, Easing, type CancelAnimation } from './utils/tween';
 
 export class TileView extends Container {
   private bg!: Sprite;
@@ -16,6 +17,7 @@ export class TileView extends Container {
   private waterStatic?: Graphics;
   private waterRenderer?: TileWaterRenderer;
   private fillProgress: number = 0;
+  private cancelBounce?: CancelAnimation;
 
   constructor(
     private row: number,
@@ -27,7 +29,7 @@ export class TileView extends Container {
     this.sortableChildren = true;
   }
 
-  // --- Initialization Methods ---
+  // ---- Initialization Methods ----
 
   async init() {
     await this.setupGraphics();
@@ -85,7 +87,7 @@ export class TileView extends Container {
     });
   }
 
-  // --- Setters ---
+  // ---- Setters ----
 
   setIsBlocked(isBlocked: boolean) {
     this.blocked = isBlocked;
@@ -119,7 +121,6 @@ export class TileView extends Container {
     this.applyRotation(rot);
     this.syncChildOrder();
 
-    // Setup water renderer
     this.waterRenderer?.setPipe(this.currentKind, this.currentRot);
     if (this.fillProgress > 0) {
       this.waterRenderer?.setFillProgress(this.fillProgress);
@@ -133,6 +134,7 @@ export class TileView extends Container {
     this.setupSpriteSizes(this.pipe);
     this.pipe.zIndex = Z_ORDERS.pipes;
     this.addChild(this.pipe);
+    this.playPlaceBounce();
   }
 
   private onPipeRenewed(tex: Texture) {
@@ -143,6 +145,7 @@ export class TileView extends Container {
 
     this.pipe.texture = tex;
     this.setupSpriteSizes(this.pipe);
+    this.playPlaceBounce();
   }
 
   clearPipe(): void {
@@ -178,7 +181,7 @@ export class TileView extends Container {
     }
   }
 
-  // --- Water Methods ---
+  // ---- Water Methods ----
 
   setWaterFillProgress(progress: number) {
     const clamped = Math.max(0, Math.min(1, progress));
@@ -228,16 +231,13 @@ export class TileView extends Container {
     return this.fillProgress > 0;
   }
 
-  // --- Helper Methods ---
+  // ---- Helper Methods ----
 
   private applyRotation(rot: Rot): void {
     if (!this.pipe || this.currentRot === rot) return;
 
     this.currentRot = rot;
     this.pipe.rotation = (Math.PI / 2) * rot;
-    // We mirror the sprite rotation onto the water renderer to keep the visual
-    // flow aligned with the pipe texture, since water segments are rendered in
-    // local space.
     this.waterRenderer?.setRotation(this.currentRot);
     if (this.fillProgress > 0) {
       this.waterRenderer?.setFillProgress(this.fillProgress);
@@ -288,5 +288,36 @@ export class TileView extends Container {
     const sx = this.tileSize / w;
     const sy = this.tileSize / h;
     sprite.scale.set(sx, sy);
+  }
+
+  // ---- Animations ----
+
+  private playPlaceBounce() {
+    if (!this.pipe) return;
+
+    if (this.cancelBounce) {
+      this.cancelBounce();
+      this.cancelBounce = undefined;
+    }
+
+    // Derive a stable base scale from texture/tile dimensions to avoid drift
+    const texW = this.pipe.texture.width || this.tileSize;
+    const texH = this.pipe.texture.height || this.tileSize;
+    const baseX = this.tileSize / texW;
+    const baseY = this.tileSize / texH;
+
+    const startFactor = 0.85;
+    // Explicitly reset to base before starting the bounce and animate relative to it
+    this.pipe.scale.set(baseX, baseY);
+    this.pipe.scale.set(baseX * startFactor, baseY * startFactor);
+
+    this.cancelBounce = animate(
+      this.config.animations?.tilePlaceBounceMs ?? 220,
+      t => {
+        const k = startFactor + (1 - startFactor) * t;
+        this.pipe!.scale.set(baseX * k, baseY * k);
+      },
+      { easing: Easing.outBack, onComplete: () => (this.cancelBounce = undefined) }
+    );
   }
 }

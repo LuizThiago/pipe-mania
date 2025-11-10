@@ -123,10 +123,12 @@ export class EndModalView extends Container {
     this.buttonLabel.position.set(this.panelWidth / 2, y + btnHeight / 2);
   }
 
+  // ---- Interactions ----
   private setupInteractions() {
     this.eventMode = 'passive';
     this.button.eventMode = 'static';
     this.button.cursor = 'pointer';
+    this.buttonLabel.eventMode = 'none';
     this.button.on('pointertap', () => {
       this.onAction?.();
     });

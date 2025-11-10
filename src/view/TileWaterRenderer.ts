@@ -82,7 +82,6 @@ export class TileWaterRenderer {
 
   clearFill() {
     this.fillProgress = 0;
-    this.entryDir = undefined;
     this.clearDynamicGraphics();
   }
 
@@ -139,20 +138,13 @@ export class TileWaterRenderer {
       return;
     }
 
-    // Deriving connections on the fly keeps us compatible with rotated sprites
-    // without storing precomputed shapes for each variant, reducing texture churn.
     const connections = this.getActiveConnections();
-    if (!this.entryDir) {
-      this.entryDir = connections[0];
-    }
-
-    const { entry, exit } = this.resolveFlow(connections, this.entryDir);
+    const currentEntry = this.entryDir ?? connections[0];
+    const { entry, exit } = this.resolveFlow(connections, currentEntry);
     if (!exit) {
       return;
     }
 
-    // The fill is rendered in the dynamic layer until the tile is committed,
-    // mirroring the physical process of water flowing through a pipe.
     this.dynamicGraphics.visible = true;
     this.dynamicGraphics.fill({ color: this.color, alpha: this.alpha });
     this.drawPath(this.dynamicGraphics, entry, exit, this.fillProgress, geometry);
@@ -265,24 +257,39 @@ export class TileWaterRenderer {
   ) {
     const clamped = Math.max(0, Math.min(1, progress));
 
-    if (!isCurve || this.currentKind === 'cross') {
+    if (this.currentKind === 'cross') {
+      this.drawCrossCenter(target, entry!, exit, clamped, geometry);
+      return;
+    }
+
+    if (!isCurve) {
       this.drawStraightCenter(target, exit, clamped, geometry);
       return;
     }
 
-    // Curves fill in two phases: first we traverse the entry quarter circle,
-    // then we spill into the exit side. This sequencing keeps the flow visually
-    // consistent with the physical pipe shape.
-    const firstPhase = Math.min(clamped, 0.5);
-    if (firstPhase > 0 && entry) {
-      const ratio = Math.min(1, firstPhase / 0.5);
-      this.fillCenterArm(target, entry, ratio, geometry);
+    // Create smooth overlap between entry and exit phases
+    // Entry arm fills from 0% to 60% (completes at 60%)
+    // Exit arm starts at 40% and fills to 100%
+    // This 20% overlap creates a smoother visual transition
+    const entryStart = 0;
+    const entryEnd = 0.6;
+    const exitStart = 0.4;
+    const exitEnd = 1.0;
+
+    // Entry arm animation
+    if (clamped >= entryStart && entry) {
+      const entryProgress = Math.min(1, (clamped - entryStart) / (entryEnd - entryStart));
+      if (entryProgress > 0) {
+        this.fillCenterArm(target, entry, entryProgress, geometry);
+      }
     }
 
-    const secondPhase = clamped - 0.5;
-    if (secondPhase > 0) {
-      const ratio = Math.min(1, secondPhase / 0.5);
-      this.fillCenterArm(target, exit, ratio, geometry);
+    // Exit arm animation
+    if (clamped >= exitStart) {
+      const exitProgress = Math.min(1, (clamped - exitStart) / (exitEnd - exitStart));
+      if (exitProgress > 0) {
+        this.fillCenterArm(target, exit, exitProgress, geometry);
+      }
     }
   }
 
@@ -305,6 +312,36 @@ export class TileWaterRenderer {
       target.rect(centerStartX, centerEndY - length, channel, length);
     } else {
       target.rect(geometry.centerStartX, geometry.centerStartY, geometry.channel, geometry.channel);
+    }
+  }
+
+  private drawCrossCenter(
+    target: Graphics,
+    entry: Dir,
+    exit: Dir,
+    progress: number,
+    geometry: PipeGeometry
+  ) {
+    const { centerStartX, centerEndX, centerStartY, centerEndY, channel } = geometry;
+    const clamped = Math.max(0, Math.min(1, progress));
+
+    const totalLength = channel;
+    const currentLength = totalLength * clamped;
+
+    if ((entry === 'left' && exit === 'right') || (entry === 'right' && exit === 'left')) {
+      // Horizontal flow
+      if (entry === 'left') {
+        target.rect(centerStartX, centerStartY, currentLength, channel);
+      } else {
+        target.rect(centerEndX - currentLength, centerStartY, currentLength, channel);
+      }
+    } else if ((entry === 'top' && exit === 'bottom') || (entry === 'bottom' && exit === 'top')) {
+      // Vertical flow
+      if (entry === 'top') {
+        target.rect(centerStartX, centerStartY, channel, currentLength);
+      } else {
+        target.rect(centerStartX, centerEndY - currentLength, channel, currentLength);
+      }
     }
   }
 
@@ -421,8 +458,6 @@ export class TileWaterRenderer {
     const horizontalArm = Math.max(0, centerStartX - leftStart);
     const verticalArm = Math.max(0, centerStartY - topStart);
 
-    // These precomputed values let us render every pipe variant with simple
-    // rect primitives, which is faster on the GPU than dynamic Bézier paths.
     return {
       size,
       edgeInset,

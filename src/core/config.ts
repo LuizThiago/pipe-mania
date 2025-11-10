@@ -14,6 +14,29 @@ export const ConfigSchema = z.object({
     backgroundCornerRadius: z.number().int().min(0).max(200).default(12),
     backgroundColor: z.string().default('#CBE1DC'),
   }),
+  animations: z
+    .object({
+      tilePlaceBounceMs: z.number().int().min(16).max(2000).default(220),
+      queueShiftOutMs: z.number().int().min(16).max(2000).default(180),
+      queueShiftMoveMs: z.number().int().min(16).max(2000).default(220),
+      queueShiftInMs: z.number().int().min(16).max(2000).default(220),
+      ghostHideMs: z.number().int().min(0).max(60000).default(220),
+      ghostSnapLerpInside: z.number().min(0).max(1).default(0.22),
+      ghostSnapLerpOutside: z.number().min(0).max(1).default(0.14),
+      ghostPulseSpeed: z.number().min(0.01).max(0.5).default(0.05),
+      ghostOutlineColor: z.string().default('#2b80ff'),
+    })
+    .default({
+      tilePlaceBounceMs: 220,
+      queueShiftOutMs: 180,
+      queueShiftMoveMs: 220,
+      queueShiftInMs: 220,
+      ghostHideMs: 220,
+      ghostSnapLerpInside: 0.22,
+      ghostSnapLerpOutside: 0.14,
+      ghostPulseSpeed: 0.05,
+      ghostOutlineColor: '#2b80ff',
+    }),
   gameplay: z.object({
     allowedPipes: z.array(z.enum(['straight', 'curve', 'cross', 'start'])).min(1),
     rngSeed: z.number().int().optional(),
@@ -109,7 +132,7 @@ export const DefaultConfig: GameConfig = {
     backgroundColor: '#CBE1DC',
   },
   gameplay: {
-    rngSeed: 1234,
+    rngSeed: 233233,
     allowedPipes: ['straight', 'curve', 'cross'],
     difficulty: {
       blockedPercentStart: 0,
@@ -156,6 +179,17 @@ export const DefaultConfig: GameConfig = {
     queueGap: 12,
     queueTopMargin: 16,
     queueBackgroundColor: '#CBE1DC',
+  },
+  animations: {
+    tilePlaceBounceMs: 220,
+    queueShiftOutMs: 180,
+    queueShiftMoveMs: 220,
+    queueShiftInMs: 220,
+    ghostHideMs: 220,
+    ghostSnapLerpInside: 0.22,
+    ghostSnapLerpOutside: 0.14,
+    ghostPulseSpeed: 0.2,
+    ghostOutlineColor: '#2b80ff',
   },
   hud: {
     labelFontSize: 20,

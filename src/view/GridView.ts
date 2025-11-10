@@ -93,6 +93,12 @@ export class GridView extends Container implements GridPort {
     if (!this.background) {
       this.background = new Graphics();
       this.addChildAt(this.background, 0);
+      this.background.eventMode = 'static';
+      this.background.on('pointertap', (e: any) => {
+        if (e?.target === this.background) {
+          this.emit('grid:bgTap');
+        }
+      });
     }
   }
 
@@ -211,5 +217,33 @@ export class GridView extends Container implements GridPort {
 
   setAllWaterFill(progress: number) {
     this.forEachTile(t => t.setWaterFillProgress(progress));
+  }
+
+  // --- Public helpers for layout/snapping ---
+
+  getTileSize(): number {
+    return this.tileSize;
+  }
+
+  getGap(): number {
+    return this.gap;
+  }
+
+  getRows(): number {
+    return this.rows;
+  }
+
+  getCols(): number {
+    return this.cols;
+  }
+
+  getContentSize(): { width: number; height: number } {
+    return { width: this.contentWidth, height: this.contentHeight };
+  }
+
+  getCellCenter(col: number, row: number): { x: number; y: number } {
+    const x = col * (this.tileSize + this.gap) + this.tileSize / 2;
+    const y = row * (this.tileSize + this.gap) + this.tileSize / 2;
+    return { x, y };
   }
 }

@@ -234,7 +234,7 @@ export class QueueView extends Container {
           this.animMoveMs,
           t => {
             // Guard against sprite being removed/destroyed while animating
-            if (!spr.parent || (spr as any).destroyed) {
+            if (!spr.parent || spr.destroyed) {
               return;
             }
             spr.x = startX + (endX - startX) * t;
@@ -310,7 +310,7 @@ export class QueueView extends Container {
         animate(
           this.animMoveMs,
           t => {
-            if (!spr.parent || (spr as any).destroyed) {
+            if (!spr.parent || spr.destroyed) {
               return;
             }
             spr.x = startX + (endX - startX) * t;
@@ -437,7 +437,7 @@ export class QueueView extends Container {
     const parent = this.parent ?? this;
 
     // Compute start in parent's coordinate space
-    const startInParent = parent.toLocal({ x: first.x, y: first.y } as any, this);
+    const startInParent = parent.toLocal({ x: first.x, y: first.y }, this);
 
     // Create a clone to fly while hiding the original to sell the illusion
     const clone = new Sprite(first.texture);
@@ -465,7 +465,7 @@ export class QueueView extends Container {
       const cancelTween = animate(
         this.animMoveMs,
         t => {
-          if (!clone.parent || (clone as any).destroyed) return;
+          if (!clone.parent || clone.destroyed) return;
           clone.x = startInParent.x + (targetInParent.x - startInParent.x) * t;
           clone.y = startInParent.y + (targetInParent.y - startInParent.y) * t;
           const s = 1 + 0.12 * t;

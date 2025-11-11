@@ -1,4 +1,4 @@
-import { Container } from 'pixi.js';
+import { Container, type FederatedPointerEvent } from 'pixi.js';
 import type { GameConfig } from '@core/config';
 import type { GridView } from '../GridView';
 import { GhostTile } from '../GhostTile';
@@ -6,7 +6,7 @@ import type { PipeQueueItem } from '@core/logic/pipesQueue';
 
 export class GhostController {
   private ghost?: GhostTile;
-  private pointerHandler?: (e: any) => void;
+  private pointerHandler?: (e: FederatedPointerEvent) => void;
   private _prevParentEventMode?: Container['eventMode'];
 
   constructor(
@@ -48,7 +48,7 @@ export class GhostController {
       this._prevParentEventMode = parent.eventMode;
       parent.eventMode = 'static';
     }
-    this.pointerHandler = (e: any) => {
+    this.pointerHandler = (e: FederatedPointerEvent) => {
       if (!this.ghost) return;
       const local = this.gridView.toLocal(e.global);
       const { col, row } = this.snapToGridCell(local);

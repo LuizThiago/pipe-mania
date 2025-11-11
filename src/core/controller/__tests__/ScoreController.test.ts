@@ -1,5 +1,6 @@
 import { ScoreController } from '../ScoreController';
 import type { GameConfig } from '@core/config';
+import type { FlowCompletionPayload } from '@core/types';
 
 describe('ScoreController', () => {
   const createMockConfig = (
@@ -181,7 +182,7 @@ describe('ScoreController', () => {
         const controller = new ScoreController(config);
         controller.setTargetFlowLength(3);
 
-        let completionPayload: any = null;
+        let completionPayload: FlowCompletionPayload | null = null;
         controller.onFlowComplete = payload => {
           completionPayload = payload;
         };
@@ -192,10 +193,10 @@ describe('ScoreController', () => {
         controller.completeFlow('noExit');
 
         expect(completionPayload).toBeTruthy();
-        expect(completionPayload.reason).toBe('noExit');
-        expect(completionPayload.totalTraversed).toBe(2);
-        expect(completionPayload.targetLength).toBe(3);
-        expect(completionPayload.goalAchieved).toBe(false);
+        expect(completionPayload!.reason).toBe('noExit');
+        expect(completionPayload!.totalTraversed).toBe(2);
+        expect(completionPayload!.targetLength).toBe(3);
+        expect(completionPayload!.goalAchieved).toBe(false);
       });
 
       it('should mark goal as achieved when target is met', () => {
@@ -203,7 +204,7 @@ describe('ScoreController', () => {
         const controller = new ScoreController(config);
         controller.setTargetFlowLength(2);
 
-        let completionPayload: any = null;
+        let completionPayload: FlowCompletionPayload | null = null;
         controller.onFlowComplete = payload => {
           completionPayload = payload;
         };
@@ -213,7 +214,7 @@ describe('ScoreController', () => {
         controller.registerFlowStep({ tile: { col: 1, row: 0 }, kind: 'straight' });
         controller.completeFlow('outOfBounds');
 
-        expect(completionPayload.goalAchieved).toBe(true);
+        expect(completionPayload!.goalAchieved).toBe(true);
       });
 
       it('should not complete flow if not active', () => {

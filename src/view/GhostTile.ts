@@ -107,7 +107,7 @@ export class GhostTile extends Container {
 			cancelAnimationFrame(this.rafId);
 			this.rafId = undefined;
 		}
-		super.destroy(options as any);
+		super.destroy(typeof options === 'boolean' ? options : options);
 	}
 }
 

@@ -413,6 +413,6 @@ export class Scene extends Container {
     }
     this.queueAnimator?.detach();
     this.ghost?.destroy();
-    super.destroy(options as any);
+    super.destroy(typeof options === 'boolean' ? options : options);
   }
 }

@@ -94,7 +94,7 @@ export class GridView extends Container implements GridPort {
       this.background = new Graphics();
       this.addChildAt(this.background, 0);
       this.background.eventMode = 'static';
-      this.background.on('pointertap', (e: any) => {
+      this.background.on('pointertap', (e: import('pixi.js').FederatedPointerEvent) => {
         if (e?.target === this.background) {
           this.emit('grid:bgTap');
         }

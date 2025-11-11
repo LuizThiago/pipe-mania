@@ -267,16 +267,24 @@ export class HudView extends Container {
     this.stageValue.style.fontSize = valueSize;
     this.brandingLabel.style.fontSize = labelSize;
 
-    (this.targetLabel as any).updateText?.();
-    (this.targetValue as any).updateText?.();
-    (this.scoreLabel as any).updateText?.();
-    (this.scoreValue as any).updateText?.();
-    (this.flowLabel as any).updateText?.();
-    (this.flowValue as any).updateText?.();
-    (this.nextLabel as any).updateText?.();
-    (this.stageLabel as any).updateText?.();
-    (this.stageValue as any).updateText?.();
-    (this.brandingLabel as any).updateText?.();
+    // Force text update after style changes for proper rendering
+    const texts = [
+      this.targetLabel,
+      this.targetValue,
+      this.scoreLabel,
+      this.scoreValue,
+      this.flowLabel,
+      this.flowValue,
+      this.nextLabel,
+      this.stageLabel,
+      this.stageValue,
+      this.brandingLabel,
+    ];
+    for (const text of texts) {
+      if ('updateText' in text && typeof text.updateText === 'function') {
+        text.updateText();
+      }
+    }
 
     this.safeMargin = Math.max(this.baseSafeMargin, tileSize * 0.35);
   }
